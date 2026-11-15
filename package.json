@@ -1,0 +1,11 @@
+{
+  "name": "peach",
+  "private": true,
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "api:dev": "npm --prefix apps/api run start:dev",
+    "api:migrate": "npm --prefix apps/api exec prisma migrate dev",
+    "api:seed": "npm --prefix apps/api run prisma:seed"
+  }
+}
