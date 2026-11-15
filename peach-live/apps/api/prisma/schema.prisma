@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  VIEWER
+  CREATOR
+  ADMIN
+}
+
+enum KycStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum StreamStatus {
+  LIVE
+  ENDED
+}
+
+enum Currency {
+  COIN
+  DIAMOND
+}
+
+enum LedgerKind {
+  COIN_PURCHASE
+  GIFT_SENT
+  GIFT_RECEIVED
+  PAYOUT
+  ADJUSTMENT
+  DEV_TOPUP
+}
+
+model User {
+  id          String          @id @default(uuid())
+  googleId    String          @unique
+  email       String          @unique
+  name        String
+  avatarUrl   String?
+  role        Role            @default(VIEWER)
+  ageVerified Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  wallet      Wallet?
+  creator     CreatorProfile?
+  streams     Stream[]
+}
+
+model CreatorProfile {
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id])
+  username  String    @unique
+  bio       String?
+  kycStatus KycStatus @default(NONE)
+}
+
+model Stream {
+  id        String        @id @default(uuid())
+  creatorId String
+  creator   User          @relation(fields: [creatorId], references: [id])
+  title     String
+  roomName  String        @unique
+  status    StreamStatus  @default(LIVE)
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+  ledger    LedgerEntry[]
+
+  @@index([status, startedAt])
+}
+
+model Gift {
+  id           String  @id @default(uuid())
+  name         String  @unique
+  coinPrice    Int
+  animationUrl String?
+}
+
+model Wallet {
+  id             String        @id @default(uuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id])
+  coinBalance    Int           @default(0)
+  diamondBalance Int           @default(0)
+  entries        LedgerEntry[]
+}
+
+// Append-only ledger. Never update or delete rows.
+model LedgerEntry {
+  id             String     @id @default(uuid())
+  walletId       String
+  wallet         Wallet     @relation(fields: [walletId], references: [id])
+  currency       Currency
+  amount         Int
+  kind           LedgerKind
+  idempotencyKey String     @unique
+  streamId       String?
+  stream         Stream?    @relation(fields: [streamId], references: [id])
+  giftId         String?
+  createdAt      DateTime   @default(now())
+
+  @@index([walletId, createdAt])
+}
