@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { StreamsModule } from './streams/streams.module';
 import { WalletModule } from './wallet/wallet.module';
 import { DevModule } from './dev/dev.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -15,5 +16,6 @@ import { DevModule } from './dev/dev.module';
     WalletModule,
     DevModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
