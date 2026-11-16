@@ -40,3 +40,5 @@ const s = StyleSheet.create({
   input: { backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10 },
   err: { color: colors.error },
 });
+
+
