@@ -71,7 +71,7 @@ export class StreamsService {
       where: { id: streamId },
       data: { status: 'ENDED', endedAt: new Date() },
     });
-    await this.livekit.deleteRoom(stream.roomName);
+    //await this.livekit.deleteRoom(stream.roomName);
     return updated;
   }
 }

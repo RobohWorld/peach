@@ -116,7 +116,7 @@ export class ModerationService {
       create: { streamId, userId: targetUserId, kind: 'KICKED' },
     });
     await this.livekit.broadcast(stream.roomName, 'system', { type: 'kicked', userId: targetUserId });
-    await this.livekit.removeParticipant(stream.roomName, targetUserId);
+    //await this.livekit.removeParticipant(stream.roomName, targetUserId);
     return { ok: true };
   }
 
@@ -171,7 +171,7 @@ export class ModerationService {
     const stream = await this.prisma.stream.findUnique({ where: { id: streamId } });
     if (!stream) throw new NotFoundException();
     await this.prisma.stream.update({ where: { id: streamId }, data: { status: 'ENDED', endedAt: new Date() } });
-    await this.livekit.deleteRoom(stream.roomName);
+    //await this.livekit.deleteRoom(stream.roomName);
     return { ok: true };
   }
 }
