@@ -10,6 +10,13 @@
     "postinstall": "prisma skills sync || exit 0"
   },
   "devDependencies": {
-    "prisma": "^8.0.0-rc.33"
+    "prisma": "^7.10.1"
+  },
+  "allowScripts": {
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true
+  },
+  "dependencies": {
+    "@prisma/client": "^7.10.1"
   }
 }
