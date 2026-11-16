@@ -29,7 +29,7 @@ export class StreamsService {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { creator: true } });
     if (user.role !== 'CREATOR') throw new ForbiddenException('Creator account required');
     // Production rule: creators must be age-verified + KYC approved.
-    if (process.env.NODE_ENV === 'production' && (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED')) {
+    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED')) {
       throw new ForbiddenException('Age verification and KYC required');
     }
     const roomName = `room_${randomUUID()}`;
@@ -46,7 +46,7 @@ export class StreamsService {
     if (!stream || stream.status !== 'LIVE') throw new NotFoundException('Stream not live');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     // Adult platform: viewers must be age-verified in production.
-    if (process.env.NODE_ENV === 'production' && !user.ageVerified) {
+    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && !user.ageVerified) {
       throw new ForbiddenException('Age verification required');
     }
     return {

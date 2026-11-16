@@ -14,7 +14,7 @@ export class DevAuthController {
 
   @Post('login')
   async login(@Body() dto: DevLoginDto) {
-    if (process.env.NODE_ENV === 'production') throw new ForbiddenException();
+    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true') throw new ForbiddenException();
     const user = await this.prisma.user.upsert({
       where: { googleId: `dev:${dto.email}` },
       update: {},

@@ -19,7 +19,7 @@ export class DevController {
   constructor(private prisma: PrismaService) {}
 
   private guard() {
-    if (process.env.NODE_ENV === 'production') throw new ForbiddenException();
+    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true') throw new ForbiddenException();
   }
 
   @Post('topup')
