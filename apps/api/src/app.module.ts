@@ -8,6 +8,7 @@ import { DevModule } from './dev/dev.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { CreatorModule } from './creator/creator.module';
 import { HealthController } from './health.controller';
+import { LivekitModule } from './livekit/livekit.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { HealthController } from './health.controller';
     PrismaModule,
     AuthModule,
     StreamsModule,
+     LivekitModule,
     WalletModule,
     DevModule,
     ModerationModule,
