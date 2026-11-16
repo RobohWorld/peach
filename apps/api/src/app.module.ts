@@ -5,6 +5,8 @@ import { AuthModule } from './auth/auth.module';
 import { StreamsModule } from './streams/streams.module';
 import { WalletModule } from './wallet/wallet.module';
 import { DevModule } from './dev/dev.module';
+import { ModerationModule } from './moderation/moderation.module';
+import { CreatorModule } from './creator/creator.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -15,6 +17,8 @@ import { HealthController } from './health.controller';
     StreamsModule,
     WalletModule,
     DevModule,
+    ModerationModule,
+    CreatorModule,
   ],
   controllers: [HealthController],
 })

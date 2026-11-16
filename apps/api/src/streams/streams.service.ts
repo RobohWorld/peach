@@ -2,18 +2,20 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { AccessToken } from 'livekit-server-sdk';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { LivekitService } from '../livekit/livekit.service';
 
 @Injectable()
 export class StreamsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private livekit: LivekitService) {}
 
+  // Clients can never publish data into a room. Chat goes through the API.
   private async token(identity: string, name: string, room: string, canPublish: boolean) {
     const at = new AccessToken(process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!, {
       identity,
       name,
       ttl: '2h',
     });
-    at.addGrant({ room, roomJoin: true, canPublish, canPublishData: true, canSubscribe: true });
+    at.addGrant({ room, roomJoin: true, canPublish, canPublishData: false, canSubscribe: true });
     return at.toJwt();
   }
 
@@ -28,7 +30,6 @@ export class StreamsService {
   async start(userId: string, title: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { creator: true } });
     if (user.role !== 'CREATOR') throw new ForbiddenException('Creator account required');
-    // Production rule: creators must be age-verified + KYC approved.
     if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED')) {
       throw new ForbiddenException('Age verification and KYC required');
     }
@@ -45,12 +46,18 @@ export class StreamsService {
     const stream = await this.prisma.stream.findUnique({ where: { id: streamId } });
     if (!stream || stream.status !== 'LIVE') throw new NotFoundException('Stream not live');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    // Adult platform: viewers must be age-verified in production.
+
+    const restriction = await this.prisma.streamRestriction.findUnique({
+      where: { streamId_userId: { streamId, userId } },
+    });
+    if (restriction?.kind === 'KICKED') throw new ForbiddenException('You were removed from this stream');
+
     if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && !user.ageVerified) {
       throw new ForbiddenException('Age verification required');
     }
     return {
       stream,
+      muted: restriction?.kind === 'MUTED',
       livekitUrl: process.env.LIVEKIT_URL,
       token: await this.token(userId, user.name, stream.roomName, false),
     };
@@ -60,6 +67,11 @@ export class StreamsService {
     const stream = await this.prisma.stream.findUnique({ where: { id: streamId } });
     if (!stream) throw new NotFoundException();
     if (stream.creatorId !== userId) throw new ForbiddenException();
-    return this.prisma.stream.update({ where: { id: streamId }, data: { status: 'ENDED', endedAt: new Date() } });
+    const updated = await this.prisma.stream.update({
+      where: { id: streamId },
+      data: { status: 'ENDED', endedAt: new Date() },
+    });
+    await this.livekit.deleteRoom(stream.roomName);
+    return updated;
   }
 }

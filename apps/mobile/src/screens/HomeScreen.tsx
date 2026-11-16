@@ -4,8 +4,8 @@ import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
-export default function HomeScreen({ onOpenRoom, onLogout }: {
-  onOpenRoom: (session: any) => void; onLogout: () => void;
+export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings }: {
+  onOpenRoom: (session: any) => void; onLogout: () => void; onOpenEarnings: () => void;
 }) {
   const [me, setMe] = useState<any>(null);
   const [live, setLive] = useState<any[]>([]);
@@ -76,6 +76,7 @@ export default function HomeScreen({ onOpenRoom, onLogout }: {
           <TextInput style={s.input} placeholder="Stream title" placeholderTextColor={colors.muted}
             value={title} onChangeText={setTitle} />
           <Btn label="Go live" onPress={goLive} disabled={busy} />
+          <Btn label="Earnings dashboard" onPress={onOpenEarnings} outline />
         </View>
       )}
 

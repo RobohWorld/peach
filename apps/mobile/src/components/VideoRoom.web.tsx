@@ -4,15 +4,20 @@ import { Room, RoomEvent, Track } from 'livekit-client';
 type Props = {
   url: string; token: string; publish: boolean;
   onMessage: (m: any) => void;
-  registerSender: (fn: (m: any) => void) => void;
+  onDisconnected: () => void;
 };
 
-export default function VideoRoom({ url, token, publish, onMessage, registerSender }: Props) {
+export default function VideoRoom({ url, token, publish, onMessage, onDisconnected }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onMsg = useRef(onMessage);
+  const onDisc = useRef(onDisconnected);
+  onMsg.current = onMessage;
+  onDisc.current = onDisconnected;
 
   useEffect(() => {
     const room = new Room();
     const audioEls: HTMLElement[] = [];
+    let closed = false;
 
     room.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind === Track.Kind.Video && videoRef.current) track.attach(videoRef.current);
@@ -23,15 +28,13 @@ export default function VideoRoom({ url, token, publish, onMessage, registerSend
       }
     });
 
-    room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
-      try { onMessage(JSON.parse(new TextDecoder().decode(payload))); } catch {}
+    // Only the server (no participant) can send chat, gift or system events.
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant) => {
+      if (participant) return;
+      try { onMsg.current(JSON.parse(new TextDecoder().decode(payload))); } catch {}
     });
 
-    registerSender((m) => {
-      room.localParticipant
-        .publishData(new TextEncoder().encode(JSON.stringify(m)), { reliable: true })
-        .catch(() => {});
-    });
+    room.on(RoomEvent.Disconnected, () => { if (!closed) onDisc.current(); });
 
     (async () => {
       await room.connect(url, token);
@@ -44,6 +47,7 @@ export default function VideoRoom({ url, token, publish, onMessage, registerSend
     })().catch((e) => console.error('LiveKit error', e));
 
     return () => {
+      closed = true;
       audioEls.forEach((el) => el.remove());
       room.disconnect();
     };

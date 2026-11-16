@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-
 import { PrismaService } from '../prisma/prisma.service';
+import { LivekitService } from '../livekit/livekit.service';
 
 @Injectable()
 export class WalletService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private livekit: LivekitService) {}
 
   getWallet(userId: string) {
     return this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
@@ -29,11 +29,10 @@ export class WalletService {
     const diamonds = Math.floor(gift.coinPrice * rate);
 
     try {
-      return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const sender = await tx.wallet.findUniqueOrThrow({ where: { userId: senderId } });
         const receiver = await tx.wallet.findUniqueOrThrow({ where: { userId: stream.creatorId } });
 
-        // Guarded decrement: count 0 if balance is insufficient, even under concurrency.
         const debited = await tx.wallet.updateMany({
           where: { id: sender.id, coinBalance: { gte: gift.coinPrice } },
           data: { coinBalance: { decrement: gift.coinPrice } },
@@ -45,17 +44,28 @@ export class WalletService {
         await tx.ledgerEntry.createMany({
           data: [
             { walletId: sender.id, currency: 'COIN', amount: -gift.coinPrice, kind: 'GIFT_SENT',
-              idempotencyKey: `${idempotencyKey}:out`, streamId, giftId },
+              idempotencyKey: `${idempotencyKey}:out`, streamId, giftId, counterpartyUserId: stream.creatorId },
             { walletId: receiver.id, currency: 'DIAMOND', amount: diamonds, kind: 'GIFT_RECEIVED',
-              idempotencyKey: `${idempotencyKey}:in`, streamId, giftId },
+              idempotencyKey: `${idempotencyKey}:in`, streamId, giftId, counterpartyUserId: senderId },
           ],
         });
 
         const updated = await tx.wallet.findUniqueOrThrow({ where: { id: sender.id } });
         return { ok: true, coinBalance: updated.coinBalance, gift, diamondsToCreator: diamonds };
       });
+
+      const user = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
+      await this.livekit.broadcast(stream.roomName, 'gift', {
+        type: 'gift',
+        from: user?.name ?? 'Someone',
+        userId: senderId,
+        gift: gift.name,
+        emoji: gift.emoji,
+        coins: gift.coinPrice,
+      });
+
+      return result;
     } catch (e) {
-      // Unique violation on idempotencyKey = this exact tap was already processed.
       if ((e as { code?: string })?.code === 'P2002') {
         const w = await this.getWallet(senderId);
         return { ok: true, duplicate: true, coinBalance: w.coinBalance };

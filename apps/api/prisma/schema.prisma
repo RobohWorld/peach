@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -64,20 +64,22 @@ model CreatorProfile {
 }
 
 model Stream {
-  id        String        @id @default(uuid())
-  creatorId String
-  creator   User          @relation(fields: [creatorId], references: [id])
-  title     String
-  roomName  String        @unique
-  status    StreamStatus  @default(LIVE)
-  startedAt DateTime      @default(now())
-  endedAt   DateTime?
-  ledger    LedgerEntry[]
+  slowModeSeconds Int           @default(0)
+  id              String        @id @default(uuid())
+  creatorId       String
+  creator         User          @relation(fields: [creatorId], references: [id])
+  title           String
+  roomName        String        @unique
+  status          StreamStatus  @default(LIVE)
+  startedAt       DateTime      @default(now())
+  endedAt         DateTime?
+  ledger          LedgerEntry[]
 
   @@index([status, startedAt])
 }
 
 model Gift {
+  emoji        String  @default("🎁")
   id           String  @id @default(uuid())
   name         String  @unique
   coinPrice    Int
@@ -95,17 +97,62 @@ model Wallet {
 
 // Append-only ledger. Never update or delete rows.
 model LedgerEntry {
-  id             String     @id @default(uuid())
-  walletId       String
-  wallet         Wallet     @relation(fields: [walletId], references: [id])
-  currency       Currency
-  amount         Int
-  kind           LedgerKind
-  idempotencyKey String     @unique
-  streamId       String?
-  stream         Stream?    @relation(fields: [streamId], references: [id])
-  giftId         String?
-  createdAt      DateTime   @default(now())
+  counterpartyUserId String?
+  id                 String     @id @default(uuid())
+  walletId           String
+  wallet             Wallet     @relation(fields: [walletId], references: [id])
+  currency           Currency
+  amount             Int
+  kind               LedgerKind
+  idempotencyKey     String     @unique
+  streamId           String?
+  stream             Stream?    @relation(fields: [streamId], references: [id])
+  giftId             String?
+  createdAt          DateTime   @default(now())
 
   @@index([walletId, createdAt])
+}
+
+enum RestrictionKind {
+  MUTED
+  KICKED
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+}
+
+model StreamRestriction {
+  id        String          @id @default(uuid())
+  streamId  String
+  userId    String
+  kind      RestrictionKind
+  createdAt DateTime        @default(now())
+
+  @@unique([streamId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  streamId  String
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([streamId, userId, createdAt])
+}
+
+model Report {
+  id           String       @id @default(uuid())
+  reporterId   String
+  targetUserId String
+  streamId     String?
+  messageId    String?
+  reason       String
+  details      String?
+  status       ReportStatus @default(OPEN)
+  createdAt    DateTime     @default(now())
+
+  @@index([status, createdAt])
 }

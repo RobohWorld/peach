@@ -3,11 +3,14 @@ import { SafeAreaView, ActivityIndicator, View, StatusBar } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import RoomScreen from './src/screens/RoomScreen';
+import EarningsScreen from './src/screens/EarningsScreen';
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
 import { colors } from './src/lib/ui';
 
-type Screen = { name: 'boot' } | { name: 'login' } | { name: 'home' } | { name: 'room'; session: any };
+type Screen =
+  | { name: 'boot' } | { name: 'login' } | { name: 'home' }
+  | { name: 'earnings' } | { name: 'room'; session: any };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'boot' });
@@ -40,8 +43,13 @@ export default function App() {
         <LoginScreen onLogin={async (t) => { setToken(t); storage.set('token', t); await afterLogin(); }} />
       )}
       {screen.name === 'home' && (
-        <HomeScreen onOpenRoom={(session) => setScreen({ name: 'room', session })} onLogout={logout} />
+        <HomeScreen
+          onOpenRoom={(session) => setScreen({ name: 'room', session })}
+          onOpenEarnings={() => setScreen({ name: 'earnings' })}
+          onLogout={logout}
+        />
       )}
+      {screen.name === 'earnings' && <EarningsScreen onBack={() => setScreen({ name: 'home' })} />}
       {screen.name === 'room' && (
         <RoomScreen session={screen.session} me={me} onLeave={() => setScreen({ name: 'home' })} />
       )}
