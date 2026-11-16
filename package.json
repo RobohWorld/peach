@@ -6,6 +6,10 @@
     "infra:down": "docker compose down",
     "api:dev": "npm --prefix apps/api run start:dev",
     "api:migrate": "npm --prefix apps/api exec prisma migrate dev",
-    "api:seed": "npm --prefix apps/api run prisma:seed"
+    "api:seed": "npm --prefix apps/api run prisma:seed",
+    "postinstall": "prisma skills sync || exit 0"
+  },
+  "devDependencies": {
+    "prisma": "^8.0.0-rc.33"
   }
 }
