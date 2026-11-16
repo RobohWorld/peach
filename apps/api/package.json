@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "Peach Live api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -34,7 +34,7 @@
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,
-    "@prisma/engines@6.19.3": true,
-    "prisma@6.19.3": true
+    "@prisma/engines@6.12.0": true,
+    "prisma@6.12.0": true
   }
 }
