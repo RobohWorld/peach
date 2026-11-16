@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Peach Live",
+    "slug": "peach-live",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
