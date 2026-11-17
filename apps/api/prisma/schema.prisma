@@ -3,8 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
- 
+  provider = "postgresql"
 }
 
 enum Role {
@@ -40,17 +39,19 @@ enum LedgerKind {
 }
 
 model User {
-  id          String          @id @default(uuid())
-  googleId    String          @unique
-  email       String          @unique
-  name        String
-  avatarUrl   String?
-  role        Role            @default(VIEWER)
-  ageVerified Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  wallet      Wallet?
-  creator     CreatorProfile?
-  streams     Stream[]
+  suspendedAt   DateTime?
+  suspendReason String?
+  id            String          @id @default(uuid())
+  googleId      String          @unique
+  email         String          @unique
+  name          String
+  avatarUrl     String?
+  role          Role            @default(VIEWER)
+  ageVerified   Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  wallet        Wallet?
+  creator       CreatorProfile?
+  streams       Stream[]
 }
 
 model CreatorProfile {
@@ -154,4 +155,41 @@ model Report {
   createdAt    DateTime     @default(now())
 
   @@index([status, createdAt])
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+// Fake money for now: "destination" is a free-text label. Do not store real bank details.
+model PayoutRequest {
+  id          String       @id @default(uuid())
+  userId      String
+  diamonds    Int
+  amountCents Int
+  method      String
+  destination String
+  status      PayoutStatus @default(PENDING)
+  adminNote   String?
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+  processedBy String?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AdminAction {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }

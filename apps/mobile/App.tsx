@@ -4,13 +4,16 @@ import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import RoomScreen from './src/screens/RoomScreen';
 import EarningsScreen from './src/screens/EarningsScreen';
+import PayoutsScreen from './src/screens/PayoutsScreen';
+import AdminScreen from './src/screens/AdminScreen';
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
 import { colors } from './src/lib/ui';
 
 type Screen =
   | { name: 'boot' } | { name: 'login' } | { name: 'home' }
-  | { name: 'earnings' } | { name: 'room'; session: any };
+  | { name: 'earnings' } | { name: 'payouts' } | { name: 'admin' }
+  | { name: 'room'; session: any };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'boot' });
@@ -32,6 +35,7 @@ export default function App() {
   }, []);
 
   const logout = () => { setToken(null); storage.del('token'); setMe(null); setScreen({ name: 'login' }); };
+  const home = () => setScreen({ name: 'home' });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -40,19 +44,27 @@ export default function App() {
         <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={colors.peach} /></View>
       )}
       {screen.name === 'login' && (
-        <LoginScreen onLogin={async (t) => { setToken(t); storage.set('token', t); await afterLogin(); }} />
+        <LoginScreen
+          onLogin={async (t) => {
+            setToken(t); storage.set('token', t);
+            try { await afterLogin(); }
+            catch (e) { setToken(null); storage.del('token'); throw e; }
+          }}
+        />
       )}
       {screen.name === 'home' && (
         <HomeScreen
           onOpenRoom={(session) => setScreen({ name: 'room', session })}
           onOpenEarnings={() => setScreen({ name: 'earnings' })}
+          onOpenPayouts={() => setScreen({ name: 'payouts' })}
+          onOpenAdmin={() => setScreen({ name: 'admin' })}
           onLogout={logout}
         />
       )}
-      {screen.name === 'earnings' && <EarningsScreen onBack={() => setScreen({ name: 'home' })} />}
-      {screen.name === 'room' && (
-        <RoomScreen session={screen.session} me={me} onLeave={() => setScreen({ name: 'home' })} />
-      )}
+      {screen.name === 'earnings' && <EarningsScreen onBack={home} />}
+      {screen.name === 'payouts' && <PayoutsScreen onBack={home} />}
+      {screen.name === 'admin' && <AdminScreen onBack={home} />}
+      {screen.name === 'room' && <RoomScreen session={screen.session} me={me} onLeave={home} />}
     </SafeAreaView>
   );
 }

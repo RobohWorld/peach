@@ -14,7 +14,7 @@ export class LivekitService {
     return this._client;
   }
 
-  /** Server-originated message to everyone in a room. Never throws (a gift is already paid for). */
+  /** Server-originated message to everyone in a room. Never throws. */
   async broadcast(room: string, topic: string, payload: unknown) {
     try {
       await this.client.sendData(
@@ -26,5 +26,15 @@ export class LivekitService {
     } catch (e) {
       this.log.warn(`broadcast failed: ${(e as Error).message}`);
     }
+  }
+
+  async removeParticipant(room: string, identity: string) {
+    try { await this.client.removeParticipant(room, identity); }
+    catch (e) { this.log.warn(`removeParticipant failed: ${(e as Error).message}`); }
+  }
+
+  async deleteRoom(room: string) {
+    try { await this.client.deleteRoom(room); }
+    catch (e) { this.log.warn(`deleteRoom failed: ${(e as Error).message}`); }
   }
 }

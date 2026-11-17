@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from './admin/admin.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -19,6 +21,8 @@ import { LivekitModule } from './livekit/livekit.module';
      LivekitModule,
     WalletModule,
     DevModule,
+    AdminModule,
+    PayoutsModule,
     ModerationModule,
     CreatorModule,
   ],

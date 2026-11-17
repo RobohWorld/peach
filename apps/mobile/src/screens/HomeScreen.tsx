@@ -4,8 +4,9 @@ import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
-export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings }: {
-  onOpenRoom: (session: any) => void; onLogout: () => void; onOpenEarnings: () => void;
+export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin }: {
+  onOpenRoom: (session: any) => void; onLogout: () => void;
+  onOpenEarnings: () => void; onOpenPayouts: () => void; onOpenAdmin: () => void;
 }) {
   const [me, setMe] = useState<any>(null);
   const [live, setLive] = useState<any[]>([]);
@@ -52,6 +53,7 @@ export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings }: {
   });
 
   const isCreator = me?.role === 'CREATOR';
+  const isAdmin = me?.role === 'ADMIN';
 
   return (
     <View style={s.wrap}>
@@ -62,12 +64,18 @@ export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings }: {
 
       {me && (
         <View style={s.card}>
-          <Text style={s.name}>{me.name} {isCreator ? '· Creator' : ''}</Text>
+          <Text style={s.name}>{me.name} {isCreator ? '· Creator' : isAdmin ? '· Admin' : ''}</Text>
           <Text style={s.muted}>Coins: {me.wallet?.coinBalance ?? 0}   Diamonds: {me.wallet?.diamondBalance ?? 0}</Text>
           <View style={s.row}>
             <View style={{ flex: 1 }}><Btn label="+500 coins (dev)" onPress={topup} disabled={busy} outline /></View>
-            {!isCreator && <View style={{ flex: 1 }}><Btn label="Become creator (dev)" onPress={becomeCreator} disabled={busy} outline /></View>}
+            {!isCreator && !isAdmin && <View style={{ flex: 1 }}><Btn label="Become creator (dev)" onPress={becomeCreator} disabled={busy} outline /></View>}
           </View>
+        </View>
+      )}
+
+      {isAdmin && (
+        <View style={s.card}>
+          <Btn label="Admin panel" onPress={onOpenAdmin} />
         </View>
       )}
 
@@ -76,7 +84,10 @@ export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings }: {
           <TextInput style={s.input} placeholder="Stream title" placeholderTextColor={colors.muted}
             value={title} onChangeText={setTitle} />
           <Btn label="Go live" onPress={goLive} disabled={busy} />
-          <Btn label="Earnings dashboard" onPress={onOpenEarnings} outline />
+          <View style={s.row}>
+            <View style={{ flex: 1 }}><Btn label="Earnings" onPress={onOpenEarnings} outline /></View>
+            <View style={{ flex: 1 }}><Btn label="Payouts" onPress={onOpenPayouts} outline /></View>
+          </View>
         </View>
       )}
 

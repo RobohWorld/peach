@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ModerationService, REPORT_REASONS } from './moderation.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
@@ -48,26 +48,5 @@ export class ModerationController {
   @Post('reports')
   report(@CurrentUser() u: AuthUser, @Body() dto: ReportDto) {
     return this.mod.report(u.id, dto);
-  }
-}
-
-@UseGuards(JwtAuthGuard)
-@Controller('admin')
-export class AdminController {
-  constructor(private mod: ModerationService) {}
-
-  @Get('reports')
-  reports(@CurrentUser() u: AuthUser) {
-    return this.mod.listReports(u.id);
-  }
-
-  @Post('reports/:id/resolve')
-  resolve(@CurrentUser() u: AuthUser, @Param('id') id: string) {
-    return this.mod.resolveReport(u.id, id);
-  }
-
-  @Post('streams/:id/end')
-  endStream(@CurrentUser() u: AuthUser, @Param('id') id: string) {
-    return this.mod.adminEndStream(u.id, id);
   }
 }

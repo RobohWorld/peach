@@ -4,7 +4,7 @@ import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
-export default function LoginScreen({ onLogin }: { onLogin: (token: string) => void }) {
+export default function LoginScreen({ onLogin }: { onLogin: (token: string) => void | Promise<void> }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
@@ -14,7 +14,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (token: string) => v
     setBusy(true); setErr('');
     try {
       const r = await api('/dev/login', { method: 'POST', body: { email: email.trim(), name: name.trim() } });
-      onLogin(r.accessToken);
+      await onLogin(r.accessToken);
     } catch (e: any) { setErr(e.message); }
     finally { setBusy(false); }
   };
