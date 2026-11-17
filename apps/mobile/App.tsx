@@ -1,3 +1,4 @@
+import './src/lib/livekit-setup';
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ActivityIndicator, View, StatusBar } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
