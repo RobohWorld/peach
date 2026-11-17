@@ -29,7 +29,7 @@ export class PayoutsService {
   async create(userId: string, dto: { diamonds: number; method: string; destination: string }) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { creator: true } });
     if (user.role !== 'CREATOR') throw new ForbiddenException('Creator account required');
-    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && user.creator?.kycStatus !== 'APPROVED') {
+    if (user.creator?.kycStatus !== 'APPROVED') {
       throw new ForbiddenException('KYC approval required before payouts');
     }
     if (dto.diamonds < this.minDiamonds) {

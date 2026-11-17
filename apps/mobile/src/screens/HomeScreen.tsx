@@ -4,9 +4,9 @@ import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
-export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin }: {
+export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply }: {
   onOpenRoom: (session: any) => void; onLogout: () => void;
-  onOpenEarnings: () => void; onOpenPayouts: () => void; onOpenAdmin: () => void;
+  onOpenEarnings: () => void; onOpenPayouts: () => void; onOpenAdmin: () => void; onOpenApply: () => void;
 }) {
   const [me, setMe] = useState<any>(null);
   const [live, setLive] = useState<any[]>([]);
@@ -32,16 +32,6 @@ export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings, onOpe
     try { await fn(); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
 
-  const becomeCreator = () => run(async () => {
-    await api('/dev/become-creator', { method: 'POST', body: { username: 'creator_' + Math.random().toString(36).slice(2, 8) } });
-    await load();
-  });
-
-  const topup = () => run(async () => {
-    await api('/dev/topup', { method: 'POST', body: { coins: 500 } });
-    await load();
-  });
-
   const goLive = () => run(async () => {
     const r = await api('/streams', { method: 'POST', body: { title: title.trim() || 'Live now' } });
     onOpenRoom({ ...r, publish: true });
@@ -66,17 +56,12 @@ export default function HomeScreen({ onOpenRoom, onLogout, onOpenEarnings, onOpe
         <View style={s.card}>
           <Text style={s.name}>{me.name} {isCreator ? '· Creator' : isAdmin ? '· Admin' : ''}</Text>
           <Text style={s.muted}>Coins: {me.wallet?.coinBalance ?? 0}   Diamonds: {me.wallet?.diamondBalance ?? 0}</Text>
-          <View style={s.row}>
-            <View style={{ flex: 1 }}><Btn label="+500 coins (dev)" onPress={topup} disabled={busy} outline /></View>
-            {!isCreator && !isAdmin && <View style={{ flex: 1 }}><Btn label="Become creator (dev)" onPress={becomeCreator} disabled={busy} outline /></View>}
-          </View>
+          {!isCreator && !isAdmin && <Btn label="Become a creator" onPress={onOpenApply} outline />}
         </View>
       )}
 
       {isAdmin && (
-        <View style={s.card}>
-          <Btn label="Admin panel" onPress={onOpenAdmin} />
-        </View>
+        <View style={s.card}><Btn label="Admin panel" onPress={onOpenAdmin} /></View>
       )}
 
       {isCreator && (

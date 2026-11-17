@@ -39,6 +39,7 @@ enum LedgerKind {
 }
 
 model User {
+  ageDeclaredAt DateTime?
   suspendedAt   DateTime?
   suspendReason String?
   id            String          @id @default(uuid())
@@ -192,4 +193,25 @@ model AdminAction {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CreatorApplication {
+  id         String            @id @default(uuid())
+  userId     String
+  username   String
+  bio        String?
+  status     ApplicationStatus @default(PENDING)
+  adminNote  String?
+  createdAt  DateTime          @default(now())
+  reviewedAt DateTime?
+  reviewedBy String?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }

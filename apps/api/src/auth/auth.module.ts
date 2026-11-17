@@ -4,13 +4,21 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 
+function jwtSecret(): string {
+  const s = process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!s || s.length < 32)) {
+    throw new Error('JWT_SECRET must be set to a random string of at least 32 characters');
+  }
+  return s ?? 'dev-secret';
+}
+
 @Global()
 @Module({
   imports: [
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET ?? 'dev-secret',
-      signOptions: { expiresIn: '30d' },
+      secret: jwtSecret(),
+      signOptions: { expiresIn: '7d' },
     }),
   ],
   controllers: [AuthController],

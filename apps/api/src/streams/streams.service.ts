@@ -30,7 +30,7 @@ export class StreamsService {
   async start(userId: string, title: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { creator: true } });
     if (user.role !== 'CREATOR') throw new ForbiddenException('Creator account required');
-    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED')) {
+    if (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED') {
       throw new ForbiddenException('Age verification and KYC required');
     }
     const roomName = `room_${randomUUID()}`;
@@ -52,7 +52,7 @@ export class StreamsService {
     });
     if (restriction?.kind === 'KICKED') throw new ForbiddenException('You were removed from this stream');
 
-    if (process.env.ALLOW_DEV_ENDPOINTS !== 'true' && !user.ageVerified) {
+    if (!user.ageVerified && !user.ageDeclaredAt) {
       throw new ForbiddenException('Age verification required');
     }
     return {
@@ -71,7 +71,7 @@ export class StreamsService {
       where: { id: streamId },
       data: { status: 'ENDED', endedAt: new Date() },
     });
-    //await this.livekit.deleteRoom(stream.roomName);
+    await this.livekit.deleteRoom(stream.roomName);
     return updated;
   }
 }

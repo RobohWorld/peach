@@ -1,36 +1,49 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 import { askText, confirmAction } from '../lib/confirm';
 
-type Tab = 'overview' | 'reports' | 'streams' | 'payouts';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['reports', 'Reports'], ['streams', 'Streams'], ['payouts', 'Payouts']];
+type Tab = 'overview' | 'applications' | 'reports' | 'streams' | 'payouts' | 'users';
+const TABS: [Tab, string][] = [
+  ['overview', 'Overview'], ['applications', 'Creators'], ['reports', 'Reports'],
+  ['streams', 'Streams'], ['payouts', 'Payouts'], ['users', 'Users'],
+];
 const P_STATUS = ['PENDING', 'APPROVED', 'PAID', 'REJECTED'];
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 export default function AdminScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
   const [overview, setOverview] = useState<any>(null);
+  const [apps, setApps] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [streams, setStreams] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [q, setQ] = useState('');
   const [pStatus, setPStatus] = useState('PENDING');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const searchUsers = useCallback(async () => {
+    if (q.trim().length < 2) { setUsers([]); return; }
+    setUsers(await api(`/admin/users?q=${encodeURIComponent(q.trim())}`));
+  }, [q]);
 
   const load = useCallback(async () => {
     try {
       setErr('');
       if (tab === 'overview') setOverview(await api('/admin/overview'));
+      if (tab === 'applications') setApps(await api('/admin/applications?status=PENDING'));
       if (tab === 'reports') setReports(await api('/admin/reports'));
       if (tab === 'streams') setStreams(await api('/admin/streams'));
       if (tab === 'payouts') setPayouts(await api(`/admin/payouts?status=${pStatus}`));
+      if (tab === 'users') await searchUsers();
     } catch (e: any) { setErr(e.message); }
-  }, [tab, pStatus]);
+  }, [tab, pStatus, searchUsers]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [tab, pStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (fn: () => Promise<any>) => {
     setBusy(true); setErr('');
@@ -65,6 +78,25 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
     act(() => api(`/admin/payouts/${id}/${action}`, { method: 'POST', body: { note } }));
   };
 
+  const approveApp = (a: any) => {
+    if (!confirmAction(`Approve @${a.username}? Only do this after you have verified they are 18+ and who they say they are.`)) return;
+    act(() => api(`/admin/applications/${a.id}/approve`, { method: 'POST', body: {} }));
+  };
+
+  const rejectApp = (a: any) => {
+    const note = askText('Reason for rejecting (the applicant will see it):');
+    if (note === null) return;
+    act(() => api(`/admin/applications/${a.id}/reject`, { method: 'POST', body: { note } }));
+  };
+
+  const grant = (u: any) => {
+    const raw = askText(`Test coins to grant ${u.name} (1-100000):`, '500');
+    if (raw === null) return;
+    const coins = parseInt(raw, 10);
+    if (!coins || coins < 1) { setErr('Enter a positive number'); return; }
+    act(() => api(`/admin/users/${u.id}/grant-coins`, { method: 'POST', body: { coins, note: 'test coins' } }));
+  };
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={s.wrap}>
       <View style={s.header}>
@@ -85,6 +117,7 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
 
       {tab === 'overview' && overview && (
         <View style={s.grid}>
+          <Stat label="Creator applications" value={overview.pendingApplications} />
           <Stat label="Open reports" value={overview.openReports} />
           <Stat label="🚨 Severe reports" value={overview.severeReports} />
           <Stat label="Live streams" value={overview.liveStreams} />
@@ -92,6 +125,24 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
           <Stat label="Pending 💎" value={overview.pendingPayoutDiamonds} />
           <Stat label="Pending amount" value={money(overview.pendingPayoutCents)} />
         </View>
+      )}
+
+      {tab === 'applications' && (
+        <>
+          {apps.length === 0 && <Text style={s.muted}>No pending applications.</Text>}
+          {apps.map((a) => (
+            <View key={a.id} style={s.card}>
+              <Text style={s.cardTitle}>@{a.username}</Text>
+              <Text style={s.muted}>{a.user?.name} · {a.user?.email}</Text>
+              <Text style={s.muted}>Applied {new Date(a.createdAt).toLocaleString()} · age {a.user?.ageDeclaredAt ? 'self-confirmed 18+' : 'not confirmed'}</Text>
+              {!!a.bio && <Text style={s.text}>{a.bio}</Text>}
+              <View style={s.row}>
+                <View style={s.cell}><Btn label="Approve" onPress={() => approveApp(a)} disabled={busy} /></View>
+                <View style={s.cell}><Btn label="Reject" onPress={() => rejectApp(a)} disabled={busy} outline /></View>
+              </View>
+            </View>
+          ))}
+        </>
       )}
 
       {tab === 'reports' && (
@@ -158,6 +209,34 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
           ))}
         </>
       )}
+
+      {tab === 'users' && (
+        <>
+          <View style={s.row}>
+            <TextInput style={[s.input, { flex: 1 }]} placeholder="Search name or email" placeholderTextColor={colors.muted}
+              autoCapitalize="none" value={q} onChangeText={setQ} onSubmitEditing={() => act(async () => {})} />
+            <View style={{ width: 90 }}><Btn label="Search" onPress={() => act(async () => {})} disabled={busy} /></View>
+          </View>
+          {users.length === 0 && <Text style={s.muted}>Type at least 2 characters and search.</Text>}
+          {users.map((u) => (
+            <View key={u.id} style={s.card}>
+              <Text style={s.cardTitle}>{u.name} · {u.role}</Text>
+              <Text style={s.muted}>{u.email}</Text>
+              <Text style={s.muted}>Coins {u.coinBalance} · Diamonds {u.diamondBalance} · {u.ageVerified ? 'age verified' : u.ageDeclaredAt ? 'age self-confirmed' : 'age not confirmed'}</Text>
+              {!!u.suspendedAt && <Text style={s.err}>Suspended: {u.suspendReason}</Text>}
+              <View style={s.row}>
+                <View style={s.cell}><Btn label="Grant coins" onPress={() => grant(u)} disabled={busy} outline /></View>
+                {u.role !== 'ADMIN' && !u.suspendedAt && (
+                  <View style={s.cell}><Btn label="Suspend" onPress={() => suspend(u.id, u.name)} disabled={busy} outline /></View>
+                )}
+                {!!u.suspendedAt && (
+                  <View style={s.cell}><Btn label="Unsuspend" onPress={() => act(() => api(`/admin/users/${u.id}/unsuspend`, { method: 'POST', body: {} }))} disabled={busy} outline /></View>
+                )}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -185,6 +264,7 @@ const s = StyleSheet.create({
   severe: { borderWidth: 1, borderColor: colors.error },
   cardTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
   cell: { minWidth: 110 },
+  input: { backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10 },
   text: { color: colors.text },
   muted: { color: colors.muted },
   err: { color: colors.error },
