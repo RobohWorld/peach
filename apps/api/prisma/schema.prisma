@@ -36,6 +36,11 @@ enum LedgerKind {
   PAYOUT
   ADJUSTMENT
   DEV_TOPUP
+  SIGNUP_GRANT
+  CONTENT_PURCHASE
+  CONTENT_SALE
+  SUBSCRIPTION_CHARGE
+  SUBSCRIPTION_EARNING
 }
 
 model User {
@@ -238,4 +243,67 @@ model PushToken {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+enum FriendStatus { 
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+  }
+
+model Friendship {
+  id          String       @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model DirectMessage {
+  id           String    @id @default(uuid())
+  friendshipId String
+  senderId     String
+  text         String
+  createdAt    DateTime  @default(now())
+  readAt       DateTime?
+  @@index([friendshipId, createdAt])
+}
+
+model MediaItem {
+  id         String   @id @default(uuid())
+  creatorId  String
+  type       String   // IMAGE | VIDEO
+  r2Key      String
+  previewKey String?
+  title      String
+  priceCoins Int?     // null = not sold individually
+  minTier    Int?     // null = no subscriber access, 1-3 = lowest tier with access
+  durationSec Int?
+  status     String   @default("PENDING") // PENDING | APPROVED | REMOVED
+  createdAt  DateTime @default(now())
+  @@index([creatorId, createdAt])
+}
+
+model MediaPurchase {
+  id        String   @id @default(uuid())
+  userId    String
+  mediaId   String
+  coinsPaid Int
+  createdAt DateTime @default(now())
+  @@unique([userId, mediaId])
+}
+
+model Subscription {
+  id               String   @id @default(uuid())
+  subscriberId     String
+  creatorId        String
+  tier             Int      // 1 = 10K, 2 = 25K, 3 = 50K
+  status           String   @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED
+  currentPeriodEnd DateTime
+  createdAt        DateTime @default(now())
+  @@unique([subscriberId, creatorId])
+  @@index([status, currentPeriodEnd])
 }
