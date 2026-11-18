@@ -21,10 +21,10 @@ export default function AgeScreen({ onDone, onLogout }: { onDone: () => Promise<
 
   return (
     <View style={s.wrap}>
-      <Text style={s.title}>Are you 18 or older?</Text>
+      <Text style={s.title}>Confirm you are 18+</Text>
       <Text style={s.text}>
-        Peach Live contains adult content. Enter your date of birth to continue. We only check it:
-        it is not stored, we only record that you confirmed you are 18+.
+        Your Google account didn't share a birthday, so we need to ask once. We only check it:
+        the date is not stored, only that you confirmed you are 18 or older.
       </Text>
       <TextInput style={s.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted}
         value={dob} onChangeText={setDob} maxLength={10} autoCapitalize="none" />

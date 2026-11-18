@@ -7,11 +7,11 @@ import { colors } from '../lib/ui';
 const SORTS: [string, string][] = [['popular', 'Popular'], ['new', 'New'], ['following', 'Following']];
 
 export default function HomeScreen({
-  onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile,
+  onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onOpenLeaderboard,
 }: {
   onOpenRoom: (session: any) => void; onLogout: () => void;
   onOpenEarnings: () => void; onOpenPayouts: () => void; onOpenAdmin: () => void;
-  onOpenApply: () => void; onOpenProfile: (username: string) => void;
+  onOpenApply: () => void; onOpenProfile: (username: string) => void; onOpenLeaderboard: () => void;
 }) {
   const [me, setMe] = useState<any>(null);
   const [live, setLive] = useState<any[]>([]);
@@ -89,6 +89,8 @@ export default function HomeScreen({
           {!!me.creator?.username && <Btn label="My profile" onPress={() => onOpenProfile(me.creator.username)} outline />}
         </View>
       )}
+
+      <Btn label="🏆 Leaderboards" onPress={onOpenLeaderboard} outline />
 
       <TextInput style={s.input} placeholder="Search streams and creators" placeholderTextColor={colors.muted}
         autoCapitalize="none" value={q} onChangeText={setQ} />

@@ -39,6 +39,8 @@ enum LedgerKind {
 }
 
 model User {
+  ageSource     String?
+  realName      String?
   ageDeclaredAt DateTime?
   suspendedAt   DateTime?
   suspendReason String?

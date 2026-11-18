@@ -3,15 +3,21 @@ import { Text, View } from 'react-native';
 import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import Btn from './Btn';
 import { colors } from '../lib/ui';
+import type { GooglePayload } from '../lib/google';
 
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-export default function GoogleButton({ onToken }: { onToken: (idToken: string) => Promise<void> }) {
+export default function GoogleButton({ onToken }: { onToken: (p: GooglePayload) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (WEB_CLIENT_ID) GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
+    if (WEB_CLIENT_ID) {
+      GoogleSignin.configure({
+        webClientId: WEB_CLIENT_ID,
+        scopes: ['https://www.googleapis.com/auth/user.birthday.read'],
+      });
+    }
   }, []);
 
   if (!WEB_CLIENT_ID) return null;
@@ -21,7 +27,11 @@ export default function GoogleButton({ onToken }: { onToken: (idToken: string) =
     try {
       await GoogleSignin.hasPlayServices();
       const res = await GoogleSignin.signIn();
-      if (isSuccessResponse(res) && res.data.idToken) await onToken(res.data.idToken);
+      if (isSuccessResponse(res) && res.data.idToken) {
+        let accessToken: string | undefined;
+        try { accessToken = (await GoogleSignin.getTokens()).accessToken; } catch {}
+        await onToken({ idToken: res.data.idToken, accessToken });
+      }
     } catch (e: any) {
       if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) return;
       setErr(e?.message ? String(e.message) : 'Google sign-in failed');

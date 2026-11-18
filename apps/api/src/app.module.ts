@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LeaderboardsModule } from './leaderboards/leaderboards.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { PushModule } from './push/push.module';
 import { ConfigModule } from '@nestjs/config';
@@ -32,6 +33,7 @@ import { HealthController } from './health.controller';
     PayoutsModule,
     ApplicationsModule,
     AdminModule,
+    LeaderboardsModule,
     ProfilesModule,
     PushModule,
   ],

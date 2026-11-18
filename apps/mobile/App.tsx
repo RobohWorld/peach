@@ -10,6 +10,7 @@ import PayoutsScreen from './src/screens/PayoutsScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import ApplyScreen from './src/screens/ApplyScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
 import { registerForPush, unregisterPush, onNotificationTap } from './src/lib/push';
@@ -19,6 +20,7 @@ type Screen =
   | { name: 'boot' } | { name: 'login' } | { name: 'age' } | { name: 'home' }
   | { name: 'earnings' } | { name: 'payouts' } | { name: 'admin' } | { name: 'apply' }
   | { name: 'profile'; username: string }
+  | { name: 'leaderboard' }
   | { name: 'room'; session: any };
 
 const needsAge = (m: any) => !m.ageVerified && !m.ageDeclaredAt;
@@ -89,6 +91,7 @@ export default function App() {
           onOpenAdmin={() => setScreen({ name: 'admin' })}
           onOpenApply={() => setScreen({ name: 'apply' })}
           onOpenProfile={(username) => setScreen({ name: 'profile', username })}
+          onOpenLeaderboard={() => setScreen({ name: 'leaderboard' })}
           onLogout={logout}
         />
       )}
@@ -96,6 +99,7 @@ export default function App() {
       {screen.name === 'payouts' && <PayoutsScreen onBack={home} />}
       {screen.name === 'admin' && <AdminScreen onBack={home} />}
       {screen.name === 'apply' && <ApplyScreen onBack={home} />}
+      {screen.name === 'leaderboard' && <LeaderboardScreen onBack={home} onOpenProfile={(username) => setScreen({ name: 'profile', username })} />}
       {screen.name === 'profile' && <ProfileScreen username={screen.username} onBack={home} onWatch={watchStream} />}
       {screen.name === 'room' && <RoomScreen session={screen.session} me={me} onLeave={home} />}
     </SafeAreaView>
