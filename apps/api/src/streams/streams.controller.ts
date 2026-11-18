@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { IsString, MaxLength } from 'class-validator';
 import { StreamsService } from './streams.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
@@ -14,10 +15,12 @@ export class StreamsController {
   constructor(private streams: StreamsService) {}
 
   @Get('live')
-  listLive() {
-    return this.streams.listLive();
+  listLive(@CurrentUser() u: AuthUser, @Query('sort') sort?: string, @Query('q') q?: string) {
+    const s = ['popular', 'new', 'following'].includes(sort ?? '') ? sort! : 'popular';
+    return this.streams.listLive(u.id, s, q);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post()
   start(@CurrentUser() user: AuthUser, @Body() dto: StartStreamDto) {
     return this.streams.start(user.id, dto.title);

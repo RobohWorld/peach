@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "411701143012",
+    "project_id": "peach-live-app",
+    "storage_bucket": "peach-live-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:411701143012:android:c9eaaab80d973a90a753f1",
+        "android_client_info": {
+          "package_name": "com.peachlive.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKOxZ-c0jsEfgAQkHbX9wnt_tcfl_e2lM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

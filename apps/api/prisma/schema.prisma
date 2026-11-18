@@ -56,12 +56,13 @@ model User {
 }
 
 model CreatorProfile {
-  id        String    @id @default(uuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id])
-  username  String    @unique
-  bio       String?
-  kycStatus KycStatus @default(NONE)
+  lastNotifiedAt DateTime?
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id])
+  username       String    @unique
+  bio            String?
+  kycStatus      KycStatus @default(NONE)
 }
 
 model Stream {
@@ -214,4 +215,25 @@ model CreatorApplication {
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followerId String
+  creatorId  String
+  createdAt  DateTime @default(now())
+
+  @@unique([followerId, creatorId])
+  @@index([creatorId])
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

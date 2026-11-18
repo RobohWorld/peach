@@ -4,6 +4,7 @@ import VideoRoom from '../components/VideoRoom';
 import GiftOverlay, { GiftEvent } from '../components/GiftOverlay';
 import Btn from '../components/Btn';
 import { api } from '../lib/api';
+import { useKeepAwake } from 'expo-keep-awake';
 import { colors } from '../lib/ui';
 
 type FeedItem = {
@@ -21,6 +22,7 @@ export default function RoomScreen({ session, me, onLeave }: {
   session: any; me: any; onLeave: () => void;
 }) {
   const isHost: boolean = session.publish;
+  useKeepAwake();
   const streamId: string = session.stream.id;
   const seq = useRef(0);
   const leaving = useRef(false);
@@ -36,6 +38,7 @@ export default function RoomScreen({ session, me, onLeave }: {
   const [muted, setMuted] = useState<boolean>(!!session.muted);
   const [selected, setSelected] = useState<FeedItem | null>(null);
   const [reporting, setReporting] = useState(false);
+  const [following, setFollowing] = useState<boolean>(!!session.creator?.isFollowing);
 
   const push = (item: Omit<FeedItem, 'id'>) =>
     setFeed((f) => [...f.slice(-60), { ...item, id: ++seq.current }]);
@@ -124,6 +127,15 @@ export default function RoomScreen({ session, me, onLeave }: {
     setReporting(false); setSelected(null);
   };
 
+  const toggleFollow = async () => {
+    const u = session.creator?.username;
+    if (!u) return;
+    const next = !following;
+    setFollowing(next);
+    try { await api(`/creators/${encodeURIComponent(u)}/${next ? 'follow' : 'unfollow'}`, { method: 'POST' }); }
+    catch (e: any) { setFollowing(!next); setErr(e.message); }
+  };
+
   const leave = async () => {
     leaving.current = true;
     if (isHost) {
@@ -138,7 +150,12 @@ export default function RoomScreen({ session, me, onLeave }: {
     <View style={s.wrap}>
       <View style={s.header}>
         <Text style={s.title}>{session.stream.title} {isHost ? '(you are live)' : ''}</Text>
-        <Pressable onPress={leave}><Text style={s.leave}>{isHost ? 'End' : 'Leave'}</Text></Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {!isHost && !!session.creator?.username && (
+            <Pressable onPress={toggleFollow}><Text style={s.leave}>{following ? '❤ Following' : '♡ Follow'}</Text></Pressable>
+          )}
+          <Pressable onPress={leave}><Text style={s.leave}>{isHost ? 'End' : 'Leave'}</Text></Pressable>
+        </View>
       </View>
 
       <View style={s.video}>

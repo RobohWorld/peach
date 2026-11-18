@@ -9,13 +9,16 @@ import EarningsScreen from './src/screens/EarningsScreen';
 import PayoutsScreen from './src/screens/PayoutsScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import ApplyScreen from './src/screens/ApplyScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
+import { registerForPush, unregisterPush, onNotificationTap } from './src/lib/push';
 import { colors } from './src/lib/ui';
 
 type Screen =
   | { name: 'boot' } | { name: 'login' } | { name: 'age' } | { name: 'home' }
   | { name: 'earnings' } | { name: 'payouts' } | { name: 'admin' } | { name: 'apply' }
+  | { name: 'profile'; username: string }
   | { name: 'room'; session: any };
 
 const needsAge = (m: any) => !m.ageVerified && !m.ageDeclaredAt;
@@ -27,7 +30,9 @@ export default function App() {
   const afterLogin = async () => {
     const m = await api('/auth/me');
     setMe(m);
-    setScreen(needsAge(m) ? { name: 'age' } : { name: 'home' });
+    if (needsAge(m)) { setScreen({ name: 'age' }); return; }
+    setScreen({ name: 'home' });
+    registerForPush().catch(() => {}); // asks for notification permission on phones
   };
 
   useEffect(() => {
@@ -39,7 +44,25 @@ export default function App() {
     })();
   }, []);
 
-  const logout = () => { setToken(null); storage.del('token'); setMe(null); setScreen({ name: 'login' }); };
+  const watchStream = async (streamId: string) => {
+    try {
+      const r = await api(`/streams/${streamId}/join`, { method: 'POST' });
+      setScreen({ name: 'room', session: { ...r, publish: false } });
+    } catch { /* stream ended or not allowed: stay where we are */ }
+  };
+
+  // Tapping an "X is live" notification opens that stream
+  useEffect(() => {
+    if (!me) return;
+    return onNotificationTap((d) => {
+      if (d?.type === 'live' && d.streamId) watchStream(String(d.streamId));
+    });
+  }, [me?.id]);
+
+  const logout = async () => {
+    await unregisterPush();
+    setToken(null); storage.del('token'); setMe(null); setScreen({ name: 'login' });
+  };
   const home = () => setScreen({ name: 'home' });
 
   return (
@@ -65,6 +88,7 @@ export default function App() {
           onOpenPayouts={() => setScreen({ name: 'payouts' })}
           onOpenAdmin={() => setScreen({ name: 'admin' })}
           onOpenApply={() => setScreen({ name: 'apply' })}
+          onOpenProfile={(username) => setScreen({ name: 'profile', username })}
           onLogout={logout}
         />
       )}
@@ -72,6 +96,7 @@ export default function App() {
       {screen.name === 'payouts' && <PayoutsScreen onBack={home} />}
       {screen.name === 'admin' && <AdminScreen onBack={home} />}
       {screen.name === 'apply' && <ApplyScreen onBack={home} />}
+      {screen.name === 'profile' && <ProfileScreen username={screen.username} onBack={home} onWatch={watchStream} />}
       {screen.name === 'room' && <RoomScreen session={screen.session} me={me} onLeave={home} />}
     </SafeAreaView>
   );

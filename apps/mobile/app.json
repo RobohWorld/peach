@@ -43,7 +43,8 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -69,7 +70,8 @@
             "extraProguardRules": "-keep class org.webrtc.** { *; }\n-keep class livekit.org.webrtc.** { *; }\n-keep class livekit.org.jni_zero.** { *; }\n-dontwarn livekit.org.jni_zero.**\n-dontwarn org.jni_zero.**\n"
           }
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

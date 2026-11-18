@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ProfilesModule } from './profiles/profiles.module';
+import { PushModule } from './push/push.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -30,6 +32,8 @@ import { HealthController } from './health.controller';
     PayoutsModule,
     ApplicationsModule,
     AdminModule,
+    ProfilesModule,
+    PushModule,
   ],
   controllers: [HealthController],
   providers: [

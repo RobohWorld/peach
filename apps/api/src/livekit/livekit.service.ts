@@ -37,4 +37,17 @@ export class LivekitService {
     try { await this.client.deleteRoom(room); }
     catch (e) { this.log.warn(`deleteRoom failed: ${(e as Error).message}`); }
   }
+
+  /** Viewers per room (participants minus the host). Returns an empty map if LiveKit is unreachable. */
+  async viewerCounts(roomNames: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (roomNames.length === 0) return out;
+    try {
+      const rooms = await this.client.listRooms(roomNames);
+      for (const r of rooms) out.set(r.name, Math.max(0, Number(r.numParticipants) - 1));
+    } catch (e) {
+      this.log.warn(`viewerCounts failed: ${(e as Error).message}`);
+    }
+    return out;
+  }
 }
