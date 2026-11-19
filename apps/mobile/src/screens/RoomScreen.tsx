@@ -26,7 +26,7 @@ export default function RoomScreen({ session, me, onLeave }: {
   const streamId: string = session.stream.id;
   const seq = useRef(0);
   const leaving = useRef(false);
-  const listRef = useRef<ScrollView>(null);
+  const listRef = useRef<any>(null);
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [effects, setEffects] = useState<GiftEvent[]>([]);
