@@ -73,13 +73,13 @@ export default function WalletScreen({ onBack }: { onBack: () => void }) {
       data={items}
       keyExtractor={(i) => i.id}
       ListHeaderComponent={header}
-      ListEmptyComponent={!loading ? <Text style={s.muted}>No transactions yet.</Text> : null}
+      ListEmptyComponent={!loading ? <Text style={s.muted}>No transactions yet.</Text> : undefined}
       ListFooterComponent={
         cursor ? (
           <Pressable onPress={() => load(cursor)} disabled={loading} style={s.more}>
             <Text style={s.moreText}>{loading ? 'Loading…' : 'Load more'}</Text>
           </Pressable>
-        ) : null
+        ) : undefined
       }
       renderItem={({ item }) => {
         const positive = item.amount > 0;
