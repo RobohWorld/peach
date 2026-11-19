@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, Image, StyleSheet } from 'react-native';
 import Btn from '../components/Btn';
+import FriendButton from '../components/FriendButton';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
@@ -66,6 +67,7 @@ export default function ProfileScreen({ username, onBack, onWatch }: {
             {!p.isMe && (
               <Btn label={p.isFollowing ? 'Following ✓' : 'Follow'} onPress={toggleFollow} disabled={busy} outline={p.isFollowing} />
             )}
+            {!p.isMe && <FriendButton username={p.username} />}
           </View>
 
           {p.isMe && (

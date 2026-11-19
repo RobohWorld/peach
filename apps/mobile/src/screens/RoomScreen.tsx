@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-
 import VideoRoom from '../components/VideoRoom';
 import GiftOverlay, { GiftEvent } from '../components/GiftOverlay';
 import Btn from '../components/Btn';
+import FriendButton from '../components/FriendButton';
 import { api } from '../lib/api';
 import { useKeepAwake } from 'expo-keep-awake';
 import { colors } from '../lib/ui';
@@ -154,6 +155,7 @@ export default function RoomScreen({ session, me, onLeave }: {
           {!isHost && !!session.creator?.username && (
             <Pressable onPress={toggleFollow}><Text style={s.leave}>{following ? '❤ Following' : '♡ Follow'}</Text></Pressable>
           )}
+          {!isHost && !!session.creator?.id && <FriendButton userId={session.creator.id} compact />}
           <Pressable onPress={leave}><Text style={s.leave}>{isHost ? 'End' : 'Leave'}</Text></Pressable>
         </View>
       </View>
@@ -195,7 +197,7 @@ export default function RoomScreen({ session, me, onLeave }: {
             <Text style={[s.line, f.kind === 'gift' && s.gift, f.kind === 'system' && s.system]}>{f.text}</Text>
           </Pressable>
         ))}
-        {feed.length === 0 && <Text style={s.muted}>No messages yet. Tap a message to moderate or report.</Text>}
+        {feed.length === 0 && <Text style={s.muted}>No messages yet. Tap a message to moderate, report or add friend.</Text>}
       </ScrollView>
 
       {canActOn && (
@@ -210,6 +212,7 @@ export default function RoomScreen({ session, me, onLeave }: {
                   <View style={s.cell}><Btn label="Kick" onPress={() => modAction('kick')} outline /></View>
                 </>
               )}
+              <View style={s.cell}><FriendButton key={selected!.userId} userId={selected!.userId} compact /></View>
               <View style={s.cell}><Btn label="Report" onPress={() => setReporting(true)} outline /></View>
               <View style={s.cell}><Btn label="Close" onPress={() => setSelected(null)} outline /></View>
             </View>

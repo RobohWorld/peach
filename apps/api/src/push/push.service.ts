@@ -43,6 +43,23 @@ export class PushService {
     }
   }
 
+  /** Push to all of one user's registered devices (friend requests, chat messages). */
+  async notifyUser(
+    userId: string,
+    title: string,
+    body: string,
+    data: Record<string, unknown> = {},
+    channelId = 'default',
+  ) {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId },
+      select: { token: true },
+      take: 20,
+    });
+    if (tokens.length === 0) return;
+    await this.send(tokens.map((t) => ({ to: t.token, title, body, sound: 'default', channelId, data })));
+  }
+
   async notifyFollowersLive(creatorId: string, creatorName: string, streamId: string, title: string) {
     const claimed = await this.prisma.creatorProfile.updateMany({
       where: {

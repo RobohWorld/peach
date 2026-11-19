@@ -22,6 +22,10 @@ export async function registerForPush(): Promise<string | null> {
       name: 'Live alerts',
       importance: Notifications.AndroidImportance.HIGH,
     });
+    await Notifications.setNotificationChannelAsync('chat', {
+      name: 'Messages and friend requests',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
   }
   let { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;

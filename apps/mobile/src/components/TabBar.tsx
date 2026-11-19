@@ -12,17 +12,23 @@ const ITEMS: { key: Tab; label: string; icon: string }[] = [
   { key: 'me', label: 'Me', icon: '👤' },
 ];
 
-export default function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+export default function TabBar({ tab, onChange, badges }: {
+  tab: Tab; onChange: (t: Tab) => void; badges?: Partial<Record<Tab, number>>;
+}) {
   return (
     <View style={s.bar}>
       {ITEMS.map((it) => {
         const on = tab === it.key;
         const center = it.key === 'live';
+        const badge = badges?.[it.key] ?? 0;
         return (
           <Pressable key={it.key} onPress={() => onChange(it.key)} style={s.item}
             accessibilityRole="button" accessibilityLabel={it.label}>
             <View style={[s.iconWrap, center && s.center, center && on && s.centerOn]}>
               <Text style={[s.icon, !on && !center && { opacity: 0.55 }]}>{it.icon}</Text>
+              {badge > 0 && (
+                <View style={s.badge}><Text style={s.badgeText}>{badge > 99 ? '99+' : badge}</Text></View>
+              )}
             </View>
             <Text style={[s.label, on && s.labelOn]}>{it.label}</Text>
           </Pressable>
@@ -44,4 +50,9 @@ const s = StyleSheet.create({
   icon: { fontSize: 20 },
   label: { color: colors.muted, fontSize: 11 },
   labelOn: { color: colors.peach, fontWeight: '700' },
+  badge: {
+    position: 'absolute', top: -2, right: -6, backgroundColor: colors.peach, borderRadius: 9,
+    minWidth: 18, paddingHorizontal: 4, alignItems: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 });

@@ -1,5 +1,5 @@
 import './src/lib/livekit-setup';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ActivityIndicator, View, StatusBar } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import AgeScreen from './src/screens/AgeScreen';
@@ -36,6 +36,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'boot' });
   const [tab, setTab] = useState<Tab>('home');
   const [me, setMe] = useState<any>(null);
+  const [unread, setUnread] = useState(0); // unread chat messages + incoming friend requests
+  const [chatTarget, setChatTarget] = useState<string | null>(null); // conversation to open from a notification
 
   const afterLogin = async () => {
     const m = await api('/auth/me');
@@ -61,17 +63,36 @@ export default function App() {
     } catch { /* stream ended or not allowed: stay where we are */ }
   };
 
-  // Tapping an "X is live" notification opens that stream
+  // Tapping a notification: "X is live" opens the stream, chat and friend alerts open the Chat tab
   useEffect(() => {
     if (!me) return;
     return onNotificationTap((d) => {
       if (d?.type === 'live' && d.streamId) watchStream(String(d.streamId));
+      else if (d?.type === 'chat' || d?.type === 'friend') {
+        setTab('chat');
+        setChatTarget(d.friendshipId ? String(d.friendshipId) : null);
+        setScreen({ name: 'home' });
+      }
     });
   }, [me?.id]);
 
+  // Chat tab badge: poll while the tab bar is on screen
+  useEffect(() => {
+    if (!me || screen.name !== 'home') return;
+    let stop = false;
+    const load = () => api('/chat/unread')
+      .then((r) => { if (!stop) setUnread(Number(r?.total) || 0); })
+      .catch(() => {});
+    load();
+    const t = setInterval(load, 10000);
+    return () => { stop = true; clearInterval(t); };
+  }, [me?.id, screen.name, tab]);
+
+  const clearChatTarget = useCallback(() => setChatTarget(null), []);
+
   const logout = async () => {
     await unregisterPush();
-    setToken(null); storage.del('token'); setMe(null); setTab('home'); setScreen({ name: 'login' });
+    setToken(null); storage.del('token'); setMe(null); setTab('home'); setUnread(0); setScreen({ name: 'login' });
   };
   // Back from any sub-screen returns to the tab the user was on.
   const home = () => setScreen({ name: 'home' });
@@ -104,7 +125,9 @@ export default function App() {
             {tab === 'live' && (
               <GoLiveScreen onOpenRoom={openRoom} onOpenApply={() => setScreen({ name: 'apply' })} />
             )}
-            {tab === 'chat' && <ChatScreen />}
+            {tab === 'chat' && me && (
+              <ChatScreen meId={me.id} openFriendshipId={chatTarget} onOpened={clearChatTarget} />
+            )}
             {tab === 'me' && (
               <MeScreen
                 onOpenWallet={() => setScreen({ name: 'wallet' })}
@@ -117,7 +140,7 @@ export default function App() {
               />
             )}
           </View>
-          <TabBar tab={tab} onChange={setTab} />
+          <TabBar tab={tab} onChange={setTab} badges={{ chat: unread }} />
         </View>
       )}
       {screen.name === 'wallet' && <WalletScreen onBack={home} />}
