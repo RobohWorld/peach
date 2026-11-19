@@ -4,6 +4,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
+import { WalletService } from '../wallet/wallet.service';
 
 type GoogleLogin = { idToken?: string; accessToken?: string; code?: string };
 type AgeStatus = 'ADULT' | 'MINOR' | 'UNKNOWN';
@@ -23,7 +24,11 @@ export class AuthService {
   private google = new OAuth2Client();
   private audiences = (process.env.GOOGLE_CLIENT_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-  constructor(private prisma: PrismaService, private jwt: JwtService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    private wallet: WalletService,
+  ) {}
 
   /** Reads the Google account birthday. The date itself is never stored. */
   private async googleAge(accessToken: string | undefined, sub: string): Promise<AgeStatus> {
@@ -107,6 +112,14 @@ export class AuthService {
         ...ageData,
       },
     });
+
+    // One-time 100,000 test coins. Idempotent, so it also covers users who signed up
+    // before this existed. A failure here must never block login.
+    try {
+      await this.wallet.grantSignupCoins(user.id);
+    } catch (e) {
+      console.error('Signup coin grant failed for user', user.id, e);
+    }
 
     // Bootstrap: emails listed in ADMIN_EMAILS become admins (Google has verified the email).
     const admins = (process.env.ADMIN_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);

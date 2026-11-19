@@ -2,13 +2,76 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LivekitService } from '../livekit/livekit.service';
+import { SIGNUP_COINS } from './wallet.constants';
 
 @Injectable()
 export class WalletService {
   constructor(private prisma: PrismaService, private livekit: LivekitService) {}
 
-  getWallet(userId: string) {
+  /**
+   * One-time signup grant (100,000 coins). Safe to call on every login:
+   * the ledger idempotencyKey "signup:<userId>" guarantees it only ever lands once.
+   */
+  async grantSignupCoins(userId: string) {
+    const key = `signup:${userId}`;
+    const wallet = await this.prisma.wallet.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+
+    const already = await this.prisma.ledgerEntry.findUnique({
+      where: { idempotencyKey: key },
+      select: { id: true },
+    });
+    if (already) return wallet;
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.ledgerEntry.create({
+          data: {
+            walletId: wallet.id,
+            currency: 'COIN',
+            amount: SIGNUP_COINS,
+            kind: 'SIGNUP_GRANT',
+            idempotencyKey: key,
+          },
+        }),
+        this.prisma.wallet.update({
+          where: { id: wallet.id },
+          data: { coinBalance: { increment: SIGNUP_COINS } },
+        }),
+      ]);
+    } catch (e) {
+      // P2002 = a parallel request already granted it. Anything else is a real error.
+      if ((e as { code?: string })?.code !== 'P2002') throw e;
+    }
+    return this.prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+  }
+
+  /** Returns the wallet, creating it and granting the signup coins first if needed. */
+  async getWallet(userId: string) {
+    await this.grantSignupCoins(userId);
     return this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+  }
+
+  /** Newest first. Pass the last item's id as `cursor` to load the next page. */
+  async listTransactions(userId: string, limit = 30, cursor?: string) {
+    const wallet = await this.getWallet(userId);
+    const take = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.prisma.ledgerEntry.findMany({
+      where: { walletId: wallet.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: {
+        id: true, currency: true, amount: true, kind: true,
+        streamId: true, giftId: true, createdAt: true,
+      },
+    });
+    const hasMore = rows.length > take;
+    const items = hasMore ? rows.slice(0, take) : rows;
+    return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
   }
 
   listGifts() {

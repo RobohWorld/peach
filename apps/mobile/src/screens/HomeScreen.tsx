@@ -1,24 +1,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
-import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
 const SORTS: [string, string][] = [['popular', 'Popular'], ['new', 'New'], ['following', 'Following']];
 
+// Home tab: live streams and search. Wallet, creator tools, admin and logout live in the Me tab;
+// going live is the center tab.
 export default function HomeScreen({
-  onOpenRoom, onLogout, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onOpenLeaderboard,
+  onOpenRoom, onOpenProfile,
 }: {
-  onOpenRoom: (session: any) => void; onLogout: () => void;
-  onOpenEarnings: () => void; onOpenPayouts: () => void; onOpenAdmin: () => void;
-  onOpenApply: () => void; onOpenProfile: (username: string) => void; onOpenLeaderboard: () => void;
+  onOpenRoom: (session: any) => void; onOpenProfile: (username: string) => void;
 }) {
-  const [me, setMe] = useState<any>(null);
   const [live, setLive] = useState<any[]>([]);
   const [creators, setCreators] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('popular');
-  const [title, setTitle] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -27,12 +24,11 @@ export default function HomeScreen({
       const term = q.trim();
       const searching = term.length >= 2;
       const qs = `sort=${sort}${searching ? `&q=${encodeURIComponent(term)}` : ''}`;
-      const [m, l, c] = await Promise.all([
-        api('/auth/me'),
+      const [l, c] = await Promise.all([
         api(`/streams/live?${qs}`),
         searching ? api(`/creators/search?q=${encodeURIComponent(term)}`) : Promise.resolve([]),
       ]);
-      setMe(m); setLive(l); setCreators(c); setErr('');
+      setLive(l); setCreators(c); setErr('');
     } catch (e: any) { setErr(e.message); }
   }, [q, sort]);
 
@@ -42,55 +38,17 @@ export default function HomeScreen({
     return () => { clearTimeout(first); clearInterval(poll); };
   }, [load]);
 
-  const run = async (fn: () => Promise<void>) => {
+  const watch = async (st: any) => {
     setBusy(true); setErr('');
-    try { await fn(); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    try {
+      const r = await api(`/streams/${st.id}/join`, { method: 'POST' });
+      onOpenRoom({ ...r, publish: false });
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
-
-  const goLive = () => run(async () => {
-    const r = await api('/streams', { method: 'POST', body: { title: title.trim() || 'Live now' } });
-    onOpenRoom({ ...r, publish: true });
-  });
-
-  const watch = (st: any) => run(async () => {
-    const r = await api(`/streams/${st.id}/join`, { method: 'POST' });
-    onOpenRoom({ ...r, publish: false });
-  });
-
-  const isCreator = me?.role === 'CREATOR';
-  const isAdmin = me?.role === 'ADMIN';
 
   const header = (
     <View style={{ gap: 12 }}>
-      <View style={s.header}>
-        <Text style={s.logo}>🍑 Peach Live</Text>
-        <Pressable onPress={onLogout}><Text style={s.link}>Log out</Text></Pressable>
-      </View>
-
-      {me && (
-        <View style={s.card}>
-          <Text style={s.name}>{me.name} {isCreator ? '· Creator' : isAdmin ? '· Admin' : ''}</Text>
-          <Text style={s.muted}>Coins: {me.wallet?.coinBalance ?? 0}   Diamonds: {me.wallet?.diamondBalance ?? 0}</Text>
-          {!isCreator && !isAdmin && <Btn label="Become a creator" onPress={onOpenApply} outline />}
-        </View>
-      )}
-
-      {isAdmin && <View style={s.card}><Btn label="Admin panel" onPress={onOpenAdmin} /></View>}
-
-      {isCreator && (
-        <View style={s.card}>
-          <TextInput style={s.input} placeholder="Stream title" placeholderTextColor={colors.muted}
-            value={title} onChangeText={setTitle} />
-          <Btn label="Go live" onPress={goLive} disabled={busy} />
-          <View style={s.row}>
-            <View style={{ flex: 1 }}><Btn label="Earnings" onPress={onOpenEarnings} outline /></View>
-            <View style={{ flex: 1 }}><Btn label="Payouts" onPress={onOpenPayouts} outline /></View>
-          </View>
-          {!!me.creator?.username && <Btn label="My profile" onPress={() => onOpenProfile(me.creator.username)} outline />}
-        </View>
-      )}
-
-      <Btn label="🏆 Leaderboards" onPress={onOpenLeaderboard} outline />
+      <Text style={s.logo}>🍑 Peach Live</Text>
 
       <TextInput style={s.input} placeholder="Search streams and creators" placeholderTextColor={colors.muted}
         autoCapitalize="none" value={q} onChangeText={setQ} />
@@ -132,7 +90,7 @@ export default function HomeScreen({
         <Text style={s.muted}>{sort === 'following' ? 'None of the creators you follow are live.' : 'Nobody is live yet.'}</Text>
       }
       renderItem={({ item }) => (
-        <Pressable style={s.stream} onPress={() => watch(item)}>
+        <Pressable style={s.stream} onPress={() => watch(item)} disabled={busy}>
           <Text style={s.name}>🔴 {item.title}</Text>
           <Text style={s.muted}>{item.creator?.name}{item.creator?.username ? ` · @${item.creator.username}` : ''}</Text>
           <View style={s.row}>
@@ -151,11 +109,8 @@ export default function HomeScreen({
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   logo: { color: colors.peach, fontSize: 24, fontWeight: '800' },
-  link: { color: colors.muted },
   link2: { color: colors.peach, fontWeight: '700' },
-  card: { backgroundColor: colors.card, borderRadius: 12, padding: 12, gap: 10 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   name: { color: colors.text, fontWeight: '700', fontSize: 16 },
   muted: { color: colors.muted },

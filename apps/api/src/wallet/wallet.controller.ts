@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { IsString, MaxLength } from 'class-validator';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
@@ -19,6 +19,16 @@ export class WalletController {
   @Get('wallet')
   get(@CurrentUser() user: AuthUser) {
     return this.wallet.getWallet(user.id);
+  }
+
+  @Get('wallet/transactions')
+  transactions(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const n = Number(limit);
+    return this.wallet.listTransactions(user.id, Number.isFinite(n) && n > 0 ? n : 30, cursor || undefined);
   }
 
   @Get('gifts')

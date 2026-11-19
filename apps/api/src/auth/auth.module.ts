@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { WalletModule } from '../wallet/wallet.module';
 
 function jwtSecret(): string {
   const s = process.env.JWT_SECRET;
@@ -15,6 +16,7 @@ function jwtSecret(): string {
 @Global()
 @Module({
   imports: [
+    WalletModule,
     JwtModule.register({
       global: true,
       secret: jwtSecret(),
