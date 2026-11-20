@@ -7,9 +7,9 @@ import { colors } from '../lib/ui';
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export default function MeScreen({
-  onOpenWallet, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onLogout,
+  onOpenWallet, onOpenLibrary, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onLogout,
 }: {
-  onOpenWallet: () => void; onOpenEarnings: () => void; onOpenPayouts: () => void;
+  onOpenWallet: () => void; onOpenLibrary: () => void; onOpenEarnings: () => void; onOpenPayouts: () => void;
   onOpenAdmin: () => void; onOpenApply: () => void; onOpenProfile: (username: string) => void;
   onLogout: () => void;
 }) {
@@ -50,6 +50,7 @@ export default function MeScreen({
               </View>
             </View>
             <Btn label="Wallet and history" onPress={onOpenWallet} />
+            <Btn label="My library" onPress={onOpenLibrary} outline />
           </View>
 
           {!isCreator && !isAdmin && (

@@ -3,6 +3,7 @@ import { LeaderboardsModule } from './leaderboards/leaderboards.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { PushModule } from './push/push.module';
 import { SocialModule } from './social/social.module';
+import { MediaModule } from './media/media.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -38,6 +39,7 @@ import { HealthController } from './health.controller';
     ProfilesModule,
     PushModule,
     SocialModule,
+    MediaModule,
   ],
   controllers: [HealthController],
   providers: [

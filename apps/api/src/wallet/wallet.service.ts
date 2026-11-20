@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { LedgerKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LivekitService } from '../livekit/livekit.service';
 import { SIGNUP_COINS } from './wallet.constants';
@@ -7,6 +7,10 @@ import { SIGNUP_COINS } from './wallet.constants';
 @Injectable()
 export class WalletService {
   constructor(private prisma: PrismaService, private livekit: LivekitService) {}
+
+  private diamondRate() {
+    return Number(process.env.GIFT_DIAMOND_RATE ?? 0.5);
+  }
 
   /**
    * One-time signup grant (100,000 coins). Safe to call on every login:
@@ -78,6 +82,47 @@ export class WalletService {
     return this.prisma.gift.findMany({ orderBy: { coinPrice: 'asc' } });
   }
 
+  /**
+   * Buyer pays coins, seller earns diamonds. Runs inside the caller's transaction so the caller
+   * can add its own writes (e.g. the purchase record) and everything commits or rolls back together.
+   * `idempotencyKey` must be unique per payment; two ledger rows are written as `<key>:out` / `<key>:in`.
+   * Throws a Prisma P2002 error when the same key was already used.
+   */
+  async transferCoinsForDiamonds(
+    tx: Prisma.TransactionClient,
+    p: { buyerId: string; sellerId: string; coins: number; kindOut: LedgerKind; kindIn: LedgerKind; idempotencyKey: string },
+  ) {
+    if (!Number.isInteger(p.coins) || p.coins <= 0) throw new BadRequestException('Invalid amount');
+    if (p.buyerId === p.sellerId) throw new BadRequestException('You cannot pay yourself');
+    const diamonds = Math.floor(p.coins * this.diamondRate());
+
+    const buyer = await tx.wallet.findUniqueOrThrow({ where: { userId: p.buyerId } });
+    const seller = await tx.wallet.upsert({
+      where: { userId: p.sellerId }, update: {}, create: { userId: p.sellerId },
+    });
+
+    // Guarded debit: only succeeds while the balance is sufficient
+    const debited = await tx.wallet.updateMany({
+      where: { id: buyer.id, coinBalance: { gte: p.coins } },
+      data: { coinBalance: { decrement: p.coins } },
+    });
+    if (debited.count === 0) throw new BadRequestException('Insufficient coins');
+
+    await tx.wallet.update({ where: { id: seller.id }, data: { diamondBalance: { increment: diamonds } } });
+
+    await tx.ledgerEntry.createMany({
+      data: [
+        { walletId: buyer.id, currency: 'COIN', amount: -p.coins, kind: p.kindOut,
+          idempotencyKey: `${p.idempotencyKey}:out`, counterpartyUserId: p.sellerId },
+        { walletId: seller.id, currency: 'DIAMOND', amount: diamonds, kind: p.kindIn,
+          idempotencyKey: `${p.idempotencyKey}:in`, counterpartyUserId: p.buyerId },
+      ],
+    });
+
+    const updated = await tx.wallet.findUniqueOrThrow({ where: { id: buyer.id } });
+    return { diamonds, coinBalance: updated.coinBalance };
+  }
+
   /** Atomic: debit viewer coins, credit creator diamonds, write 2 ledger rows. Idempotent. */
   async sendGift(senderId: string, streamId: string, giftId: string, idempotencyKey: string) {
     const [stream, gift] = await Promise.all([
@@ -88,8 +133,7 @@ export class WalletService {
     if (!gift) throw new NotFoundException('Gift not found');
     if (stream.creatorId === senderId) throw new BadRequestException('Cannot gift yourself');
 
-    const rate = Number(process.env.GIFT_DIAMOND_RATE ?? 0.5);
-    const diamonds = Math.floor(gift.coinPrice * rate);
+    const diamonds = Math.floor(gift.coinPrice * this.diamondRate());
 
     try {
       const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, Image, StyleSheet } from 'react-native';
 import Btn from '../components/Btn';
 import FriendButton from '../components/FriendButton';
+import CreatorMedia from '../components/CreatorMedia';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
@@ -79,6 +80,8 @@ export default function ProfileScreen({ username, onBack, onWatch }: {
               <Btn label={busy ? 'Saving...' : 'Save bio'} onPress={saveBio} disabled={busy} />
             </View>
           )}
+
+          <CreatorMedia username={p.username} isMe={!!p.isMe} />
         </>
       )}
     </ScrollView>
