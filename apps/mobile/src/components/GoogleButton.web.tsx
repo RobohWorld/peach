@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import Btn from './Btn';
 import { colors } from '../lib/ui';
+import { BIRTHDAY_SCOPE, USE_GOOGLE_BIRTHDAY } from '../lib/googleScopes';
 import type { GooglePayload } from '../lib/google';
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-const SCOPE = 'openid email profile https://www.googleapis.com/auth/user.birthday.read';
+const SCOPE = USE_GOOGLE_BIRTHDAY ? `openid email profile ${BIRTHDAY_SCOPE}` : 'openid email profile';
 
 export default function GoogleButton({ onToken }: { onToken: (p: GooglePayload) => Promise<void> }) {
   const client = useRef<any>(null);

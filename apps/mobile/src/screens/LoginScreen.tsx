@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import GoogleButton from '../components/GoogleButton';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
+import { USE_GOOGLE_BIRTHDAY } from '../lib/googleScopes';
 import type { GooglePayload } from '../lib/google';
 
 export default function LoginScreen({ onLogin }: { onLogin: (token: string) => void | Promise<void> }) {
@@ -25,8 +26,9 @@ export default function LoginScreen({ onLogin }: { onLogin: (token: string) => v
       <Text style={s.sub}>Adults only (18+). Sign in with Google to continue.</Text>
       <GoogleButton onToken={google} />
       <Text style={s.fine}>
-        We read your Google birthday once to confirm you are 18 or older. We don't store it,
-        and other users never see your Google name or photo.
+        {USE_GOOGLE_BIRTHDAY
+          ? "We read your Google birthday once to confirm you are 18 or older. We don't store it, and other users never see your Google name or photo."
+          : "You will be asked to confirm your date of birth. We don't store it, and other users never see your Google name or photo."}
       </Text>
       {!!err && <Text style={s.err}>{err}</Text>}
     </View>
