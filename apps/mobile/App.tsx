@@ -10,6 +10,7 @@ import ChatScreen from './src/screens/ChatScreen';
 import MeScreen from './src/screens/MeScreen';
 import WalletScreen from './src/screens/WalletScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
+import SubscriptionsScreen from './src/screens/SubscriptionsScreen';
 import RoomScreen from './src/screens/RoomScreen';
 import EarningsScreen from './src/screens/EarningsScreen';
 import PayoutsScreen from './src/screens/PayoutsScreen';
@@ -26,7 +27,7 @@ import { colors } from './src/lib/ui';
 type Screen =
   | { name: 'boot' } | { name: 'login' } | { name: 'age' } | { name: 'home' }
   | { name: 'earnings' } | { name: 'payouts' } | { name: 'admin' } | { name: 'apply' }
-  | { name: 'wallet' } | { name: 'library' }
+  | { name: 'wallet' } | { name: 'library' } | { name: 'subscriptions' }
   | { name: 'profile'; username: string }
   | { name: 'leaderboard' }
   | { name: 'room'; session: any };
@@ -133,6 +134,7 @@ export default function App() {
               <MeScreen
                 onOpenWallet={() => setScreen({ name: 'wallet' })}
                 onOpenLibrary={() => setScreen({ name: 'library' })}
+                onOpenSubscriptions={() => setScreen({ name: 'subscriptions' })}
                 onOpenEarnings={() => setScreen({ name: 'earnings' })}
                 onOpenPayouts={() => setScreen({ name: 'payouts' })}
                 onOpenAdmin={() => setScreen({ name: 'admin' })}
@@ -147,6 +149,7 @@ export default function App() {
       )}
       {screen.name === 'wallet' && <WalletScreen onBack={home} />}
       {screen.name === 'library' && <LibraryScreen onBack={home} />}
+      {screen.name === 'subscriptions' && <SubscriptionsScreen onBack={home} onOpenProfile={openProfile} />}
       {screen.name === 'earnings' && <EarningsScreen onBack={home} />}
       {screen.name === 'payouts' && <PayoutsScreen onBack={home} />}
       {screen.name === 'admin' && <AdminScreen onBack={home} />}

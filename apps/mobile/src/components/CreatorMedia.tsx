@@ -7,6 +7,7 @@ import { pickMedia, uploadMedia, Picked, MAX_VIDEO_SECONDS } from '../lib/mediaU
 import { colors } from '../lib/ui';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
+const TIER_NAMES = ['', 'Fan', 'Supporter', 'VIP'];
 
 // Photos and videos on a creator profile. Visitors can unlock items with coins;
 // the creator sees their own items, upload form and sales.
@@ -22,6 +23,7 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
   const [picked, setPicked] = useState<Picked | null>(null);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
+  const [tier, setTier] = useState(0); // 0 = not included in a subscription
   const [step, setStep] = useState('');
   const [note, setNote] = useState('');
 
@@ -54,13 +56,14 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
 
   const upload = async () => {
     if (!picked) return;
-    const coins = Number(price);
+    const coins = price.trim() === '' ? null : Number(price);
     if (!title.trim()) return setErr('Add a title');
-    if (!Number.isInteger(coins) || coins < 1) return setErr('Price must be a whole number of coins, at least 1');
+    if (coins !== null && (!Number.isInteger(coins) || coins < 1)) return setErr('Price must be a whole number of coins, at least 1');
+    if (coins === null && tier === 0) return setErr('Set a price, choose a subscriber tier, or both');
     setErr(''); setNote('');
     try {
-      const r = await uploadMedia(picked, title.trim(), coins, setStep);
-      setPicked(null); setTitle(''); setPrice('');
+      const r = await uploadMedia(picked, title.trim(), coins, tier === 0 ? null : tier, setStep);
+      setPicked(null); setTitle(''); setPrice(''); setTier(0);
       setNote(r.status === 'PENDING' ? 'Uploaded. It will appear after review.' : 'Uploaded and live.');
       await load();
     } catch (e: any) { setErr(e.message); } finally { setStep(''); }
@@ -85,8 +88,16 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
               </Text>
               <TextInput style={s.input} placeholder="Title" placeholderTextColor={colors.muted}
                 value={title} onChangeText={setTitle} maxLength={80} />
-              <TextInput style={s.input} placeholder="Price in coins" placeholderTextColor={colors.muted}
+              <TextInput style={s.input} placeholder="Price in coins (leave empty for subscribers only)" placeholderTextColor={colors.muted}
                 value={price} onChangeText={(v) => setPrice(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" maxLength={6} />
+              <Text style={s.muted}>Included for subscribers at this tier or higher:</Text>
+              <View style={s.chips}>
+                {[0, 1, 2, 3].map((t) => (
+                  <Pressable key={t} onPress={() => setTier(t)} style={[s.chip, tier === t && s.chipOn]}>
+                    <Text style={[s.chipText, tier === t && { color: '#fff' }]}>{t === 0 ? 'None' : `${TIER_NAMES[t]}+`}</Text>
+                  </Pressable>
+                ))}
+              </View>
               <Btn label={busyUpload ? step : 'Upload'} onPress={upload} disabled={busyUpload} />
               <Btn label="Cancel" onPress={() => setPicked(null)} outline disabled={busyUpload} />
             </>
@@ -109,7 +120,11 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
                 <Text style={s.big}>🎬</Text>
               )}
               {!it.owned && (
-                <View style={s.lock}><Text style={s.lockText}>🔒 {fmt(it.priceCoins ?? 0)} 🪙</Text></View>
+                <View style={s.lock}>
+                  <Text style={s.lockText}>
+                    🔒 {it.priceCoins ? `${fmt(it.priceCoins)} 🪙` : `${TIER_NAMES[it.minTier ?? 1]}+`}
+                  </Text>
+                </View>
               )}
               {it.owned && <View style={s.lock}><Text style={s.lockText}>Tap to view</Text></View>}
               {it.type === 'VIDEO' && !!it.durationSec && <Text style={s.dur}>{it.durationSec}s</Text>}
@@ -120,7 +135,7 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
             {isMe ? (
               <>
                 <Text style={s.muted}>
-                  {fmt(it.priceCoins ?? 0)} 🪙 · {it.sales} sold{it.status === 'PENDING' ? ' · awaiting review' : ''}
+                  {it.priceCoins ? `${fmt(it.priceCoins)} 🪙` : 'Subscribers only'}{it.minTier ? ` · ${TIER_NAMES[it.minTier]}+` : ''} · {it.sales} sold{it.status === 'PENDING' ? ' · awaiting review' : ''}
                 </Text>
                 {removeId === it.id ? (
                   <View style={{ gap: 6 }}>
@@ -132,6 +147,8 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
                   <Pressable onPress={() => setRemoveId(it.id)}><Text style={s.link}>Remove</Text></Pressable>
                 )}
               </>
+            ) : !it.owned && !it.priceCoins ? (
+              <Text style={s.muted}>Subscribe to {TIER_NAMES[it.minTier ?? 1]} or higher to view.</Text>
             ) : !it.owned ? (
               confirmId === it.id ? (
                 <View style={{ gap: 6 }}>
@@ -140,7 +157,10 @@ export default function CreatorMedia({ username, isMe }: { username: string; isM
                   <Btn label="Cancel" onPress={() => setConfirmId(null)} outline />
                 </View>
               ) : (
-                <Btn label={`Unlock · ${fmt(it.priceCoins ?? 0)}`} onPress={() => setConfirmId(it.id)} />
+                <View style={{ gap: 4 }}>
+                  <Btn label={`Unlock · ${fmt(it.priceCoins ?? 0)}`} onPress={() => setConfirmId(it.id)} />
+                  {!!it.minTier && <Text style={s.muted}>Or subscribe to {TIER_NAMES[it.minTier]}+</Text>}
+                </View>
               )
             ) : null}
           </View>
@@ -158,6 +178,10 @@ const s = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 12, padding: 14, gap: 10 },
   input: { backgroundColor: colors.bg, color: colors.text, padding: 12, borderRadius: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { borderWidth: 1, borderColor: colors.peach, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
+  chipOn: { backgroundColor: colors.peach },
+  chipText: { color: colors.peach, fontWeight: '700' },
   item: { width: '48%', backgroundColor: colors.card, borderRadius: 12, padding: 8, gap: 6 },
   preview: { height: 140, borderRadius: 8, overflow: 'hidden', backgroundColor: '#2c2438', alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 36 },

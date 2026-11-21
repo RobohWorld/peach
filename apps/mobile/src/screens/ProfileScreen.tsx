@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, ScrollView, Image, StyleSheet } from 
 import Btn from '../components/Btn';
 import FriendButton from '../components/FriendButton';
 import CreatorMedia from '../components/CreatorMedia';
+import SubscribePanel from '../components/SubscribePanel';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
@@ -81,6 +82,7 @@ export default function ProfileScreen({ username, onBack, onWatch }: {
             </View>
           )}
 
+          <SubscribePanel username={p.username} isMe={!!p.isMe} />
           <CreatorMedia username={p.username} isMe={!!p.isMe} />
         </>
       )}

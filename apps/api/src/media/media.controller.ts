@@ -17,7 +17,8 @@ class CreateMediaDto {
   @IsString() @MaxLength(300) mediaKey: string;
   @IsOptional() @IsString() @MaxLength(300) previewKey?: string;
   @IsString() @MaxLength(120) title: string;
-  @IsInt() @Min(1) @Max(1_000_000) priceCoins: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1_000_000) priceCoins?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(3) minTier?: number;
   @IsOptional() @IsInt() @Min(1) @Max(600) durationSec?: number;
 }
 

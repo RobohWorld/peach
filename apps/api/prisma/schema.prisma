@@ -70,6 +70,7 @@ model CreatorProfile {
   username       String    @unique
   bio            String?
   kycStatus      KycStatus @default(NONE)
+  enabledTiers   Int[]     @default([1, 2, 3])
 }
 
 model Stream {
@@ -301,6 +302,7 @@ model Subscription {
   subscriberId     String
   creatorId        String
   tier             Int      // 1 = 10K, 2 = 25K, 3 = 50K
+  nextTier         Int?
   status           String   @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED
   currentPeriodEnd DateTime
   createdAt        DateTime @default(now())

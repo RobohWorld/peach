@@ -71,7 +71,7 @@ async function putBlob(url: string, blob: Blob, contentType: string) {
 
 /** Uploads straight to storage, then registers the item. Photos are re-encoded as JPEG (this also removes location data). */
 export async function uploadMedia(
-  p: Picked, title: string, priceCoins: number, progress: (step: string) => void,
+  p: Picked, title: string, priceCoins: number | null, minTier: number | null, progress: (step: string) => void,
 ): Promise<{ id: string; status: string }> {
   progress('Preparing...');
   let mainUri = p.uri;
@@ -102,7 +102,9 @@ export async function uploadMedia(
   return api('/media', {
     method: 'POST',
     body: {
-      type: p.kind, mediaKey: up.mediaKey, title, priceCoins,
+      type: p.kind, mediaKey: up.mediaKey, title,
+      ...(priceCoins !== null ? { priceCoins } : {}),
+      ...(minTier !== null ? { minTier } : {}),
       ...(up.previewKey ? { previewKey: up.previewKey } : {}),
       ...(p.kind === 'VIDEO' ? { durationSec: p.durationSec } : {}),
     },

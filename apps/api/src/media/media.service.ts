@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { R2Service } from './r2.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export type MediaType = 'IMAGE' | 'VIDEO';
 
@@ -27,6 +28,7 @@ export class MediaService {
     private prisma: PrismaService,
     private wallet: WalletService,
     private r2: R2Service,
+    private subs: SubscriptionsService,
   ) {}
 
   // ---------- creator side ----------
@@ -72,7 +74,7 @@ export class MediaService {
 
   /** Step 2: after uploading, the creator confirms. We check the files really are in storage. */
   async create(userId: string, p: {
-    type: MediaType; mediaKey: string; previewKey?: string; title: string; priceCoins: number; durationSec?: number;
+    type: MediaType; mediaKey: string; previewKey?: string; title: string; priceCoins?: number | null; minTier?: number | null; durationSec?: number;
   }) {
     await this.assertCreator(userId);
     const limit = LIMITS[p.type];
@@ -80,9 +82,16 @@ export class MediaService {
 
     const title = (p.title ?? '').trim();
     if (!title || title.length > 80) throw new BadRequestException('Title must be 1 to 80 characters');
-    if (!Number.isInteger(p.priceCoins) || p.priceCoins < MIN_PRICE || p.priceCoins > MAX_PRICE) {
+    // An item can be sold for coins, included in a subscriber tier, or both.
+    const priceCoins = p.priceCoins ?? null;
+    const minTier = p.minTier ?? null;
+    if (priceCoins === null && minTier === null) {
+      throw new BadRequestException('Set a price, a subscriber tier, or both');
+    }
+    if (priceCoins !== null && (!Number.isInteger(priceCoins) || priceCoins < MIN_PRICE || priceCoins > MAX_PRICE)) {
       throw new BadRequestException(`Price must be between ${MIN_PRICE} and ${MAX_PRICE} coins`);
     }
+    if (minTier !== null && ![1, 2, 3].includes(minTier)) throw new BadRequestException('Tier must be 1, 2 or 3');
     if (!p.mediaKey.startsWith(`media/${userId}/`)) throw new ForbiddenException('Invalid file');
 
     let durationSec: number | null = null;
@@ -119,7 +128,7 @@ export class MediaService {
     // Otherwise they wait as PENDING until an admin approves them.
     const status = process.env.MEDIA_AUTO_APPROVE === 'true' ? 'APPROVED' : 'PENDING';
     const item = await this.prisma.mediaItem.create({
-      data: { creatorId: userId, type: p.type, r2Key: p.mediaKey, previewKey, title, priceCoins: p.priceCoins, durationSec, status },
+      data: { creatorId: userId, type: p.type, r2Key: p.mediaKey, previewKey, title, priceCoins, minTier, durationSec, status },
     });
     return { id: item.id, status: item.status };
   }
@@ -164,6 +173,7 @@ export class MediaService {
         : Promise.resolve([]),
     ]);
     const owned = new Set(mine.map((m) => m.mediaId));
+    const viewerTier = isMe ? 3 : await this.subs.activeTier(viewerId, profile.userId);
     const sold = new Map(sales.map((s) => [s.mediaId, s._count._all]));
 
     return Promise.all(items.map(async (i) => ({
@@ -171,9 +181,10 @@ export class MediaService {
       type: i.type,
       title: i.title,
       priceCoins: i.priceCoins,
+      minTier: i.minTier,
       durationSec: i.durationSec,
       createdAt: i.createdAt,
-      owned: isMe || owned.has(i.id),
+      owned: isMe || owned.has(i.id) || (i.minTier != null && viewerTier >= i.minTier),
       previewUrl: i.previewKey ? await this.r2.presignGet(i.previewKey, PREVIEW_URL_SECONDS) : null,
       ...(isMe ? { status: i.status, sales: sold.get(i.id) ?? 0 } : {}),
     })));
@@ -219,7 +230,11 @@ export class MediaService {
       const bought = await this.prisma.mediaPurchase.findUnique({
         where: { userId_mediaId: { userId, mediaId } }, select: { id: true },
       });
-      if (!bought) throw new ForbiddenException('Unlock this content first');
+      if (!bought) {
+        // Subscribers of a high enough tier can view it too
+        const tier = item.minTier != null ? await this.subs.activeTier(userId, item.creatorId) : 0;
+        if (item.minTier == null || tier < item.minTier) throw new ForbiddenException('Unlock this content first');
+      }
     }
     return { type: item.type, url: await this.r2.presignGet(item.r2Key, VIEW_URL_SECONDS), expiresInSeconds: VIEW_URL_SECONDS };
   }
@@ -272,7 +287,7 @@ export class MediaService {
       where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' }, take: 50,
     });
     return Promise.all(items.map(async (i) => ({
-      id: i.id, creatorId: i.creatorId, type: i.type, title: i.title, priceCoins: i.priceCoins, createdAt: i.createdAt,
+      id: i.id, creatorId: i.creatorId, type: i.type, title: i.title, priceCoins: i.priceCoins, minTier: i.minTier, createdAt: i.createdAt,
       url: await this.r2.presignGet(i.r2Key, VIEW_URL_SECONDS),
       previewUrl: i.previewKey ? await this.r2.presignGet(i.previewKey, VIEW_URL_SECONDS) : null,
     })));
