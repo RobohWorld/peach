@@ -41,6 +41,7 @@ import {
   onNotificationTap,
 } from './src/lib/push';
 import { colors } from './src/lib/ui';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 type Screen =
   | { name: 'boot' }
@@ -56,7 +57,8 @@ type Screen =
   | { name: 'subscriptions' }
   | { name: 'profile'; username: string }
   | { name: 'leaderboard' }
-  | { name: 'room'; session: any };
+  | { name: 'room'; session: any }
+  | { name: 'notifications' };
 
 const needsAge = (m: any) => !m.ageVerified && !m.ageDeclaredAt;
 
@@ -117,6 +119,11 @@ function Shell() {
       // Stream ended or not allowed: stay where we are.
     }
   };
+
+  const openNotification = (d: any) => {
+  if (d?.type === 'live' && d.streamId) watchStream(String(d.streamId));
+  else if (d?.type === 'friend' || d?.type === 'chat') { setTab('chat'); setScreen({ name: 'home' }); }
+};
 
   // Tapping a notification: live opens the stream.
   // Chat and friend alerts open the Chat tab.
@@ -243,6 +250,7 @@ function Shell() {
                   onOpenRoom={openRoom}
                   onOpenProfile={openProfile}
                     onOpenWallet={() => setScreen({ name: 'wallet' })}
+                     onOpenNotifications={() => setScreen({ name: 'notifications' })}
                 />
               )}
 
@@ -362,6 +370,10 @@ function Shell() {
             onLeave={home}
           />
         )}
+
+        {screen.name === 'notifications' && (
+  <NotificationsScreen onBack={home} onOpen={openNotification} />
+)}
       </View>
     </KeyboardAvoidingView>
   );

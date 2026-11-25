@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ActivityIndicator ,  Pressable} from 'react-native';
 import Btn from '../components/Btn';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
+
+const CATS = ['chat', 'music', 'dance', 'gaming', 'fitness', 'talk', 'other'];
 
 export default function GoLiveScreen({
   onOpenRoom, onOpenApply,
@@ -11,15 +13,18 @@ export default function GoLiveScreen({
   const [title, setTitle] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [category, setCategory] = useState('chat');
+const [tagText, setTagText] = useState('');
 
   useEffect(() => {
     api('/auth/me').then(setMe).catch((e) => setErr(e.message));
   }, []);
 
   const start = async () => {
+    const tags = tagText.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 5);
     setBusy(true); setErr('');
     try {
-      const r = await api('/streams', { method: 'POST', body: { title: title.trim() || 'Live now' } });
+  const r = await api('/streams', { method: 'POST', body: { title: title.trim() || 'Live now', category, tags } });
       onOpenRoom({ ...r, publish: true });
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -46,6 +51,16 @@ export default function GoLiveScreen({
             <Text style={s.muted}>
               Apply to stream, earn diamonds from gifts, and sell your photos and videos.
             </Text>
+
+            <View style={s.chips}>
+  {CATS.map((c) => (
+    <Pressable key={c} onPress={() => setCategory(c)} style={[s.chip, category === c && s.chipOn]}>
+      <Text style={[s.chipText, category === c && { color: '#fff' }]}>{c}</Text>
+    </Pressable>
+  ))}
+</View>
+<TextInput style={s.input} placeholder="Tags, comma separated (max 5)" placeholderTextColor={colors.muted}
+  value={tagText} onChangeText={setTagText} autoCapitalize="none" maxLength={80} />
             <Btn label="Apply now" onPress={onOpenApply} />
           </>
         )}
@@ -62,4 +77,9 @@ const s = StyleSheet.create({
   muted: { color: colors.muted },
   input: { backgroundColor: colors.bg, color: colors.text, padding: 12, borderRadius: 10 },
   err: { color: colors.error },
+
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+chip: { borderWidth: 1, borderColor: colors.peach, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
+chipOn: { backgroundColor: colors.peach },
+chipText: { color: colors.peach, fontWeight: '700' },
 });

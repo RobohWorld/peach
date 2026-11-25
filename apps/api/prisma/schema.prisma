@@ -85,7 +85,25 @@ model Stream {
   endedAt         DateTime?
   ledger          LedgerEntry[]
 
-  @@index([status, startedAt])
+ 
+  category   String?
+  tags       String[] @default([])
+
+  @@index([status, startedAt, category])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String    // live | friend | chat
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }
 
 model Gift {
@@ -230,6 +248,7 @@ model Follow {
   followerId String
   creatorId  String
   createdAt  DateTime @default(now())
+  muteLive   Boolean  @default(false)
 
   @@unique([followerId, creatorId])
   @@index([creatorId])

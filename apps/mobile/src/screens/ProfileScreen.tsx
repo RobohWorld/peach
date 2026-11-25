@@ -34,6 +34,15 @@ export default function ProfileScreen({ username, onBack, onWatch }: {
     finally { setBusy(false); }
   };
 
+  const toggleMute = async () => {
+  if (!p) return;
+  setBusy(true); setErr('');
+  try {
+    const r = await api(`/creators/${encodeURIComponent(username)}/mute-live`, { method: 'POST', body: { muted: !p.muteLive } });
+    setP({ ...p, muteLive: r.muteLive });
+  } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+};
+
   const saveBio = async () => {
     setBusy(true); setErr(''); setOk('');
     try { await api('/creator/profile', { method: 'PUT', body: { bio } }); setOk('Saved'); }
@@ -69,6 +78,10 @@ export default function ProfileScreen({ username, onBack, onWatch }: {
             {!p.isMe && (
               <Btn label={p.isFollowing ? 'Following ✓' : 'Follow'} onPress={toggleFollow} disabled={busy} outline={p.isFollowing} />
             )}
+
+            {!p.isMe && p.isFollowing && (
+  <Btn label={p.muteLive ? '🔕 Live alerts off' : '🔔 Live alerts on'} onPress={toggleMute} disabled={busy} outline />
+)}
             {!p.isMe && <FriendButton username={p.username} />}
           </View>
 

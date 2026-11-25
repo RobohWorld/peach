@@ -40,6 +40,7 @@ export default function RoomScreen({ session, me, onLeave }: {
   const [selected, setSelected] = useState<FeedItem | null>(null);
   const [reporting, setReporting] = useState(false);
   const [following, setFollowing] = useState<boolean>(!!session.creator?.isFollowing);
+  const [sending, setSending] = useState(false);
 
   const push = (item: Omit<FeedItem, 'id'>) =>
     setFeed((f) => [...f.slice(-60), { ...item, id: ++seq.current }]);
@@ -77,16 +78,15 @@ export default function RoomScreen({ session, me, onLeave }: {
     setTimeout(onLeave, 1800);
   };
 
-  const sendGift = async (g: any) => {
-    setErr('');
-    try {
-      const r = await api('/gifts/send', {
-        method: 'POST',
-        body: { streamId, giftId: g.id, idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` },
-      });
-      setCoins(r.coinBalance); // the animation arrives from the server broadcast
-    } catch (e: any) { setErr(e.message); }
-  };
+const sendGift = async (g: any) => {
+  if (sending) return;
+  setErr(''); setSending(true);
+  try {
+    const r = await api('/gifts/send', { method: 'POST', body: { streamId, giftId: g.id,
+      idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` } });
+    setCoins(r.coinBalance);
+  } catch (e: any) { setErr(e.message); } finally { setSending(false); }
+};
 
   const sendChat = async () => {
     const text = draft.trim();
@@ -243,18 +243,25 @@ export default function RoomScreen({ session, me, onLeave }: {
 
       {!!err && <Text style={s.err}>{err}</Text>}
 
-      {!isHost && (
-        <View style={{ gap: 8 }}>
-          <Text style={s.muted}>Your coins: {coins ?? '...'}</Text>
-          <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
-            {gifts.map((g) => (
-              <View key={g.id} style={{ width: 150 }}>
-                <Btn label={`${g.emoji ?? '🎁'} ${g.name} · ${g.coinPrice}`} onPress={() => sendGift(g)} />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+    {!isHost && (
+  <View style={{ gap: 6 }}>
+    <Text style={s.muted}>🪙 {coins === null ? '...' : Number(coins).toLocaleString()}</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      {gifts.map((g) => {
+        const poor = coins !== null && coins < g.coinPrice;
+        return (
+          <Pressable key={g.id} onPress={() => sendGift(g)} disabled={poor || sending}
+            accessibilityRole="button" accessibilityLabel={`Send ${g.name} for ${g.coinPrice} coins`}
+            style={[s.tile, (poor || sending) && { opacity: 0.45 }]}>
+            <Text style={s.tileEmoji}>{g.emoji ?? '🎁'}</Text>
+            <Text style={s.tileName} numberOfLines={1}>{g.name}</Text>
+            <Text style={s.tilePrice}>🪙 {Number(g.coinPrice).toLocaleString()}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  </View>
+)}
     </View>
   );
 }
@@ -280,4 +287,8 @@ chat: { flexGrow: 0, flexShrink: 1, minHeight: 80, maxHeight: 150, backgroundCol
   input: { flex: 1, backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10 },
   muted: { color: colors.muted },
   err: { color: colors.error },
+  tile: { width: 84, minHeight: 72, backgroundColor: colors.card, borderRadius: 12, paddingVertical: 8, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: '#2c2438' },
+tileEmoji: { fontSize: 28 },
+tileName: { color: colors.text, fontSize: 12, fontWeight: '600', paddingHorizontal: 4 },
+tilePrice: { color: colors.peach, fontSize: 12, fontWeight: '800' },
 });

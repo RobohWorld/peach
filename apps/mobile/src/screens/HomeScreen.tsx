@@ -1,20 +1,53 @@
+
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
+
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 import WalletChip from '../components/WalletChip';
+import NotificationBell from '../components/NotificationBell';
 
-const SORTS: [string, string][] = [['popular', 'Popular'], ['new', 'New'], ['following', 'Following']];
+const SORTS: [string, string][] = [
+  ['popular', 'Popular'],
+  ['new', 'New'],
+  ['following', 'Following'],
+];
+
+const CATS: [string, string][] = [
+  ['', 'All'],
+  ['chat', 'Chat'],
+  ['music', 'Music'],
+  ['dance', 'Dance'],
+  ['gaming', 'Gaming'],
+  ['fitness', 'Fitness'],
+  ['talk', 'Talk'],
+  ['other', 'Other'],
+];
 
 export default function HomeScreen({
-  onOpenRoom, onOpenProfile,  onOpenWallet,
+  onOpenRoom,
+  onOpenProfile,
+  onOpenWallet,
+  onOpenNotifications,
 }: {
-  onOpenRoom: (session: any) => void; onOpenProfile: (username: string) => void; onOpenWallet: () => void;
+  onOpenRoom: (session: any) => void;
+  onOpenProfile: (username: string) => void;
+  onOpenWallet: () => void;
+  onOpenNotifications: () => void;
 }) {
   const [live, setLive] = useState<any[]>([]);
   const [creators, setCreators] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('popular');
+  const [category, setCategory] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -22,54 +55,134 @@ export default function HomeScreen({
     try {
       const term = q.trim();
       const searching = term.length >= 2;
-      const qs = `sort=${sort}${searching ? `&q=${encodeURIComponent(term)}` : ''}`;
+
+      const qs = `sort=${sort}${category ? `&category=${category}` : ''}${searching ? `&q=${encodeURIComponent(term)}` : ''}`;
+
       const [l, c] = await Promise.all([
         api(`/streams/live?${qs}`),
-        searching ? api(`/creators/search?q=${encodeURIComponent(term)}`) : Promise.resolve([]),
+        searching
+          ? api(`/creators/search?q=${encodeURIComponent(term)}`)
+          : Promise.resolve([]),
       ]);
-      setLive(l); setCreators(c); setErr('');
-    } catch (e: any) { setErr(e.message); }
-  }, [q, sort]);
+
+      setLive(l);
+      setCreators(c);
+      setErr('');
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  }, [q, sort, category]);
 
   useEffect(() => {
     const first = setTimeout(load, 350);
     const poll = setInterval(load, 10000);
-    return () => { clearTimeout(first); clearInterval(poll); };
+
+    return () => {
+      clearTimeout(first);
+      clearInterval(poll);
+    };
   }, [load]);
 
   const watch = async (st: any) => {
-    setBusy(true); setErr('');
+    setBusy(true);
+    setErr('');
+
     try {
-      const r = await api(`/streams/${st.id}/join`, { method: 'POST' });
+      const r = await api(`/streams/${st.id}/join`, {
+        method: 'POST',
+      });
+
       onOpenRoom({ ...r, publish: false });
-    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const header = (
-    <View style={s.top}>
-     <Text style={s.logo}>🍑 Peach Live</Text>
-     <WalletChip onPress={onOpenWallet} />
-      
-      <TextInput style={s.input} placeholder="Search streams and creators" placeholderTextColor={colors.muted}
-        autoCapitalize="none" value={q} onChangeText={setQ} />
+    <View style={s.header}>
+      <View style={s.top}>
+        <Text style={s.logo}>🍑 Peach Live</Text>
+
+        <View style={s.topRight}>
+          <NotificationBell onPress={onOpenNotifications} />
+          <WalletChip onPress={onOpenWallet} />
+        </View>
+      </View>
+
+      <TextInput
+        style={s.input}
+        placeholder="Search streams and creators"
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        value={q}
+        onChangeText={setQ}
+      />
 
       <View style={s.row}>
         {SORTS.map(([key, label]) => (
-          <Pressable key={key} onPress={() => setSort(key)} style={[s.chip, sort === key && s.chipOn]}>
-            <Text style={[s.chipText, sort === key && { color: '#fff' }]}>{label}</Text>
+          <Pressable
+            key={key}
+            onPress={() => setSort(key)}
+            style={[s.chip, sort === key && s.chipOn]}
+          >
+            <Text
+              style={[
+                s.chipText,
+                sort === key && { color: '#fff' },
+              ]}
+            >
+              {label}
+            </Text>
           </Pressable>
         ))}
       </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.categoryList}
+      >
+        {CATS.map(([key, label]) => (
+          <Pressable
+            key={key || 'all'}
+            onPress={() => setCategory(key)}
+            style={[
+              s.chip,
+              category === key && s.chipOn,
+            ]}
+          >
+            <Text
+              style={[
+                s.chipText,
+                category === key && { color: '#fff' },
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
       {!!err && <Text style={s.err}>{err}</Text>}
 
       {creators.length > 0 && (
         <>
           <Text style={s.section}>Creators</Text>
+
           {creators.map((c) => (
-            <Pressable key={c.username} style={s.stream} onPress={() => onOpenProfile(c.username)}>
+            <Pressable
+              key={c.username}
+              style={s.stream}
+              onPress={() => onOpenProfile(c.username)}
+            >
               <Text style={s.name}>{c.name}</Text>
-              <Text style={s.muted}>@{c.username} · {c.followers} follower{c.followers === 1 ? '' : 's'}</Text>
+
+              <Text style={s.muted}>
+                @{c.username} · {c.followers} follower
+                {c.followers === 1 ? '' : 's'}
+              </Text>
             </Pressable>
           ))}
         </>
@@ -82,21 +195,56 @@ export default function HomeScreen({
   return (
     <FlatList
       style={s.wrap}
-      contentContainerStyle={{ padding: 16, gap: 8, maxWidth: 520, width: '100%', alignSelf: 'center' }}
+      contentContainerStyle={{
+        padding: 16,
+        gap: 8,
+        maxWidth: 520,
+        width: '100%',
+        alignSelf: 'center',
+      }}
       data={live}
       keyExtractor={(i) => i.id}
       ListHeaderComponent={header}
       ListEmptyComponent={
-        <Text style={s.muted}>{sort === 'following' ? 'None of the creators you follow are live.' : 'Nobody is live yet.'}</Text>
+        <Text style={s.muted}>
+          {sort === 'following'
+            ? 'None of the creators you follow are live.'
+            : 'Nobody is live yet.'}
+        </Text>
       }
       renderItem={({ item }) => (
-        <Pressable style={s.stream} onPress={() => watch(item)} disabled={busy}>
+        <Pressable
+          style={s.stream}
+          onPress={() => watch(item)}
+          disabled={busy}
+        >
           <Text style={s.name}>🔴 {item.title}</Text>
-          <Text style={s.muted}>{item.creator?.name}{item.creator?.username ? ` · @${item.creator.username}` : ''}</Text>
+
+          <Text style={s.muted}>
+            {item.creator?.name}
+            {item.creator?.username
+              ? ` · @${item.creator.username}`
+              : ''}
+          </Text>
+
+          {!!item.category && (
+            <Text style={s.muted}>
+              #{item.category}
+              {(item.tags ?? []).map((t: string) => ` #${t}`).join('')}
+            </Text>
+          )}
+
           <View style={s.row}>
-            <Text style={s.muted}>👁 {item.viewers}   ♥ {item.followers}</Text>
+            <Text style={s.muted}>
+              👁 {item.viewers}   ♥ {item.followers}
+            </Text>
+
             {!!item.creator?.username && (
-              <Pressable onPress={() => onOpenProfile(item.creator.username)}>
+              <Pressable
+                onPress={() =>
+                  onOpenProfile(item.creator.username)
+                }
+              >
                 <Text style={s.link2}>View profile</Text>
               </Pressable>
             )}
@@ -108,18 +256,83 @@ export default function HomeScreen({
 }
 
 const s = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  wrap: { flex: 1, backgroundColor: colors.bg },
-  logo: { color: colors.peach, fontSize: 24, fontWeight: '800' },
-  link2: { color: colors.peach, fontWeight: '700' },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
-  name: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  muted: { color: colors.muted },
-  section: { color: colors.text, fontWeight: '700', fontSize: 18, marginTop: 8 },
-  stream: { backgroundColor: colors.card, borderRadius: 12, padding: 14, gap: 4 },
-  input: { backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10 },
-  chip: { borderWidth: 1, borderColor: colors.peach, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
-  chipOn: { backgroundColor: colors.peach },
-  chipText: { color: colors.peach, fontWeight: '700' },
-  err: { color: colors.error },
+  header: {
+    gap: 10,
+  },
+  top: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  topRight: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  wrap: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  logo: {
+    color: colors.peach,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  link2: {
+    color: colors.peach,
+    fontWeight: '700',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  categoryList: {
+    gap: 8,
+  },
+  name: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  muted: {
+    color: colors.muted,
+  },
+  section: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 18,
+    marginTop: 8,
+  },
+  stream: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
+  },
+  input: {
+    backgroundColor: colors.card,
+    color: colors.text,
+    padding: 12,
+    borderRadius: 10,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.peach,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  chipOn: {
+    backgroundColor: colors.peach,
+  },
+  chipText: {
+    color: colors.peach,
+    fontWeight: '700',
+  },
+  err: {
+    color: colors.error,
+  },
 });

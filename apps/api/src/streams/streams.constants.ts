@@ -1,0 +1,1 @@
+export const CATEGORIES = ['chat', 'music', 'dance', 'gaming', 'fitness', 'talk', 'other'] as const;
