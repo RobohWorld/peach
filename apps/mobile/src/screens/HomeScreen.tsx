@@ -2,15 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
+import WalletChip from '../components/WalletChip';
 
 const SORTS: [string, string][] = [['popular', 'Popular'], ['new', 'New'], ['following', 'Following']];
 
-// Home tab: live streams and search. Wallet, creator tools, admin and logout live in the Me tab;
-// going live is the center tab.
 export default function HomeScreen({
-  onOpenRoom, onOpenProfile,
+  onOpenRoom, onOpenProfile,  onOpenWallet,
 }: {
-  onOpenRoom: (session: any) => void; onOpenProfile: (username: string) => void;
+  onOpenRoom: (session: any) => void; onOpenProfile: (username: string) => void; onOpenWallet: () => void;
 }) {
   const [live, setLive] = useState<any[]>([]);
   const [creators, setCreators] = useState<any[]>([]);
@@ -47,9 +46,10 @@ export default function HomeScreen({
   };
 
   const header = (
-    <View style={{ gap: 12 }}>
-      <Text style={s.logo}>🍑 Peach Live</Text>
-
+    <View style={s.top}>
+     <Text style={s.logo}>🍑 Peach Live</Text>
+     <WalletChip onPress={onOpenWallet} />
+      
       <TextInput style={s.input} placeholder="Search streams and creators" placeholderTextColor={colors.muted}
         autoCapitalize="none" value={q} onChangeText={setQ} />
 
@@ -108,6 +108,7 @@ export default function HomeScreen({
 }
 
 const s = StyleSheet.create({
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   wrap: { flex: 1, backgroundColor: colors.bg },
   logo: { color: colors.peach, fontSize: 24, fontWeight: '800' },
   link2: { color: colors.peach, fontWeight: '700' },

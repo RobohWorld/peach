@@ -242,6 +242,7 @@ function Shell() {
                 <HomeScreen
                   onOpenRoom={openRoom}
                   onOpenProfile={openProfile}
+                    onOpenWallet={() => setScreen({ name: 'wallet' })}
                 />
               )}
 
