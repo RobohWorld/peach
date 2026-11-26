@@ -1,6 +1,5 @@
-
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Linking } from 'react-native';
 import Btn from '../components/Btn';
 import AdminContent from '../components/AdminContent';
 import AdminRefunds from '../components/AdminRefunds';
@@ -108,6 +107,28 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
     }));
   };
 
+  type ReportAction = 'DISMISS' | 'WARN' | 'REMOVE_CONTENT' | 'END_STREAM' | 'SUSPEND';
+
+const resolveWith = (id: string, action: ReportAction) => {
+  const prompts: Record<ReportAction, string> = {
+    DISMISS: 'Note (optional):',
+    WARN: 'Warning text (the user will see it):',
+    REMOVE_CONTENT: 'Reason for removing (logged; buyers get refund cases to review):',
+    END_STREAM: 'Note (optional):',
+    SUSPEND: 'Reason for suspending (logged):',
+  };
+  const note = askText(prompts[action]);
+  if (note === null) return;
+  if (action === 'REMOVE_CONTENT' && !confirmAction('Remove this content for everyone?')) return;
+  if (action === 'SUSPEND' && !confirmAction('Suspend this user? Their live streams end immediately and they are blocked from the app.')) return;
+  act(() => api(`/admin/reports/${id}/resolve`, { method: 'POST', body: { action, note } }));
+};
+
+const viewContent = async (mediaId: string) => {
+  try { const r = await api(`/admin/media/${mediaId}/view`); await Linking.openURL(r.url); }
+  catch (e: any) { setErr(e.message); }
+};
+
   const payoutAction = (id: string, action: 'approve' | 'pay' | 'reject') => {
     let note = '';
     if (action === 'reject') {
@@ -197,6 +218,7 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
 
           {/* New pending refunds counter */}
           <Stat label="Pending refunds" value={overview.pendingRefunds ?? 0} />
+          <Stat label="Flagged content" value={overview.flaggedContent ?? 0} />
         </View>
       )}
 
@@ -237,34 +259,23 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
             <Text style={s.muted}>No open reports. 🎉</Text>
           )}
           {reports.map((r) => (
-            <View key={r.id} style={[s.card, r.severe && s.severe]}>
-              <Text style={s.cardTitle}>
-                {r.severe ? '🚨 ' : ''}{r.reason}
-              </Text>
-              <Text style={s.muted}>
-                {r.reporter?.name ?? '?'} reported {r.target?.name ?? '?'} ·{' '}
-                {new Date(r.createdAt).toLocaleString()}
-              </Text>
-              {!!r.details && <Text style={s.text}>{r.details}</Text>}
-              <View style={s.row}>
-                <View style={s.cell}>
-                  <Btn label="Dismiss" onPress={() => resolve(r.id)} disabled={busy} outline />
-                </View>
-                <View style={s.cell}>
-                  <Btn
-                    label="Suspend user"
-                    onPress={() => suspend(r.targetUserId, r.target?.name ?? 'user')}
-                    disabled={busy}
-                    outline
-                  />
-                </View>
-                {!!r.streamId && (
-                  <View style={s.cell}>
-                    <Btn label="End stream" onPress={() => endStream(r.streamId)} disabled={busy} outline />
-                  </View>
-                )}
-              </View>
-            </View>
+           <View key={r.id} style={[s.card, r.severe && s.severe]}>
+  <Text style={s.cardTitle}>{r.severe ? '🚨 ' : ''}{r.reason}</Text>
+  <Text style={s.muted}>
+    {r.reporter?.name ?? '?'} reported {r.target?.name ?? '?'} · {new Date(r.createdAt).toLocaleString()}
+  </Text>
+  {!!r.media && <Text style={s.text}>Content: "{r.media.title}" ({r.media.type}) · {r.media.status}</Text>}
+  {r.openAgainstTarget > 1 && <Text style={s.muted}>{r.openAgainstTarget} open reports against this user</Text>}
+  {!!r.details && <Text style={s.text}>{r.details}</Text>}
+  <View style={s.row}>
+    {!!r.mediaId && <View style={s.cell}><Btn label="View content" onPress={() => viewContent(r.mediaId)} outline /></View>}
+    <View style={s.cell}><Btn label="Dismiss" onPress={() => resolveWith(r.id, 'DISMISS')} disabled={busy} outline /></View>
+    <View style={s.cell}><Btn label="Warn" onPress={() => resolveWith(r.id, 'WARN')} disabled={busy} outline /></View>
+    {!!r.mediaId && <View style={s.cell}><Btn label="Remove content" onPress={() => resolveWith(r.id, 'REMOVE_CONTENT')} disabled={busy} outline /></View>}
+    {!!r.streamId && <View style={s.cell}><Btn label="End stream" onPress={() => resolveWith(r.id, 'END_STREAM')} disabled={busy} outline /></View>}
+    <View style={s.cell}><Btn label="Suspend user" onPress={() => resolveWith(r.id, 'SUSPEND')} disabled={busy} outline /></View>
+  </View>
+</View>
           ))}
         </>
       )}

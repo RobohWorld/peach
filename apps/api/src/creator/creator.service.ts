@@ -82,4 +82,122 @@ export class CreatorService {
       })),
     };
   }
+
+  async dashboard(userId: string, daysRaw?: number) {
+  const days = daysRaw === 30 ? 30 : 7;
+  const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  if (user.role !== 'CREATOR') throw new ForbiddenException('Creator account required');
+  const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+
+  const DAY = 86_400_000;
+  const now = Date.now();
+  const since = new Date(now - days * DAY);
+  const kinds = ['GIFT_RECEIVED', 'CONTENT_SALE', 'SUBSCRIPTION_EARNING', 'CONTENT_CLAWBACK'] as const;
+  const where = { walletId: wallet.id, kind: { in: [...kinds] } };
+
+  const [lifetimeRows, periodRows, entries, subs, followers, newFollowers, items, streams, openRefunds] =
+    await Promise.all([
+      this.prisma.ledgerEntry.groupBy({ by: ['kind'], where, _sum: { amount: true } }),
+      this.prisma.ledgerEntry.groupBy({ by: ['kind'], where: { ...where, createdAt: { gte: since } }, _sum: { amount: true } }),
+      this.prisma.ledgerEntry.findMany({
+        where: { ...where, createdAt: { gte: since } }, select: { amount: true, createdAt: true }, take: 10000,
+      }),
+      this.prisma.subscription.findMany({
+        where: { creatorId: userId }, select: { tier: true, status: true, currentPeriodEnd: true, createdAt: true }, take: 5000,
+      }),
+      this.prisma.follow.count({ where: { creatorId: userId } }),
+      this.prisma.follow.count({ where: { creatorId: userId, createdAt: { gte: since } } }),
+      this.prisma.mediaItem.findMany({
+        where: { creatorId: userId, status: { not: 'REMOVED' } },
+        select: { id: true, title: true, type: true, status: true }, take: 300,
+      }),
+      this.prisma.stream.findMany({ where: { creatorId: userId }, orderBy: { startedAt: 'desc' }, take: 8 }),
+      this.prisma.refundRequest.count({ where: { creatorId: userId, status: 'PENDING' } }),
+    ]);
+
+  const pick = (rows: { kind: string; _sum: { amount: number | null } }[], k: string) =>
+    rows.find((r) => r.kind === k)?._sum.amount ?? 0;
+  const bySource = (rows: { kind: string; _sum: { amount: number | null } }[]) => {
+    const o = {
+      gifts: pick(rows, 'GIFT_RECEIVED'),
+      content: pick(rows, 'CONTENT_SALE'),
+      subscriptions: pick(rows, 'SUBSCRIPTION_EARNING'),
+      refunds: pick(rows, 'CONTENT_CLAWBACK'), // negative: diamonds taken back after refunds
+    };
+    return { ...o, total: o.gifts + o.content + o.subscriptions + o.refunds };
+  };
+
+  const daily = Array.from({ length: days }, (_, i) => ({
+    date: new Date(now - (days - 1 - i) * DAY).toISOString().slice(0, 10),
+    diamonds: 0,
+  }));
+  const dayIndex = new Map(daily.map((d, i) => [d.date, i]));
+  for (const e of entries) {
+    const i = dayIndex.get(e.createdAt.toISOString().slice(0, 10));
+    if (i !== undefined) daily[i].diamonds += e.amount;
+  }
+
+  const live = subs.filter((x) => x.currentPeriodEnd.getTime() > now);
+  const subscribers = {
+    active: live.filter((x) => x.status === 'ACTIVE').length,
+    cancelling: live.filter((x) => x.status !== 'ACTIVE').length,
+    byTier: [1, 2, 3].map((tier) => ({ tier, count: live.filter((x) => x.tier === tier).length })),
+    new: subs.filter((x) => x.createdAt >= since).length,
+    lapsed: subs.filter((x) => x.currentPeriodEnd.getTime() <= now && x.currentPeriodEnd >= since).length,
+  };
+
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+  const topSales = items.length
+    ? await this.prisma.mediaPurchase.groupBy({
+        by: ['mediaId'],
+        where: { mediaId: { in: items.map((i) => i.id) }, createdAt: { gte: since } },
+        _count: { _all: true },
+        _sum: { coinsPaid: true },
+        orderBy: { _sum: { coinsPaid: 'desc' } },
+        take: 5,
+      })
+    : [];
+
+  const streamIds = streams.map((s) => s.id);
+  const streamGifts = streamIds.length
+    ? await this.prisma.ledgerEntry.groupBy({
+        by: ['streamId'],
+        where: { walletId: wallet.id, kind: 'GIFT_RECEIVED', streamId: { in: streamIds } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      })
+    : [];
+  const giftsByStream = new Map(streamGifts.map((g) => [g.streamId, g]));
+
+  return {
+    days,
+    diamondBalance: wallet.diamondBalance,
+    period: bySource(periodRows),
+    lifetime: bySource(lifetimeRows),
+    daily,
+    audience: { followers, newFollowers },
+    subscribers,
+    topContent: topSales.map((t) => ({
+      mediaId: t.mediaId,
+      title: itemMap.get(t.mediaId)?.title ?? 'Item',
+      type: itemMap.get(t.mediaId)?.type ?? 'IMAGE',
+      sales: t._count._all,
+      coins: t._sum.coinsPaid ?? 0,
+    })),
+    streamHistory: streams.map((s) => ({
+      streamId: s.id,
+      title: s.title,
+      startedAt: s.startedAt,
+      live: s.status === 'LIVE',
+      minutes: Math.max(1, Math.round(((s.endedAt?.getTime() ?? now) - s.startedAt.getTime()) / 60_000)),
+      diamonds: giftsByStream.get(s.id)?._sum.amount ?? 0,
+      gifts: giftsByStream.get(s.id)?._count._all ?? 0,
+    })),
+    needsAttention: {
+      openRefundCases: openRefunds,
+      flaggedItems: items.filter((i) => i.status === 'FLAGGED').length,
+      pendingReview: items.filter((i) => i.status === 'PENDING').length,
+    },
+  };
+}
 }

@@ -1,14 +1,20 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../common/current-user.decorator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+
 
 class NoteDto { @IsOptional() @IsString() @MaxLength(300) note?: string; }
 class ReasonDto { @IsString() @MaxLength(300) reason: string; }
 class GrantDto {
   @IsInt() @Min(1) @Max(100000) coins: number;
   @IsOptional() @IsString() @MaxLength(200) note?: string;
+}
+
+class ResolveDto {
+  @IsOptional() @IsIn(['DISMISS', 'WARN', 'REMOVE_CONTENT', 'END_STREAM', 'SUSPEND']) action?: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -22,10 +28,10 @@ export class AdminController {
   @Get('reports')
   reports(@CurrentUser() u: AuthUser) { return this.admin.reports(u.id); }
 
-  @Post('reports/:id/resolve')
-  resolve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: NoteDto) {
-    return this.admin.resolveReport(u.id, id, dto.note);
-  }
+@Post('reports/:id/resolve')
+resolve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ResolveDto) {
+  return this.admin.resolveReport(u.id, id, dto);
+}
 
   @Get('streams')
   streams(@CurrentUser() u: AuthUser) { return this.admin.liveStreams(u.id); }
@@ -52,4 +58,5 @@ export class AdminController {
   unsuspend(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.admin.unsuspend(u.id, id);
   }
+  
 }

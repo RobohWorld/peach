@@ -10,5 +10,7 @@ import { RefundsService } from './refunds.service';
   imports: [WalletModule, SubscriptionsModule],
   controllers: [MediaController],
   providers: [MediaService, R2Service, RefundsService],
+exports: [MediaService]
 })
 export class MediaModule {}
+

@@ -105,6 +105,7 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+  @@index([type, createdAt])
 }
 
 model Gift {
@@ -183,7 +184,15 @@ model Report {
   status       ReportStatus @default(OPEN)
   createdAt    DateTime     @default(now())
 
+  mediaId    String?
+  resolution String?
+  adminNote  String?
+  resolvedBy String?
+  resolvedAt DateTime?
+
   @@index([status, createdAt])
+  @@index([mediaId, status])
+  @@index([reporterId, createdAt])
 }
 
 enum PayoutStatus {

@@ -8,9 +8,10 @@ class ChatDto { @IsString() @MaxLength(500) text: string; }
 class SlowDto { @IsInt() @Min(0) @Max(120) seconds: number; }
 class TargetDto { @IsString() userId: string; }
 class ReportDto {
-  @IsString() targetUserId: string;
+  @IsOptional() @IsString() targetUserId?: string;
   @IsOptional() @IsString() streamId?: string;
   @IsOptional() @IsString() messageId?: string;
+  @IsOptional() @IsString() mediaId?: string;
   @IsIn(REPORT_REASONS) reason: string;
   @IsOptional() @IsString() @MaxLength(500) details?: string;
 }

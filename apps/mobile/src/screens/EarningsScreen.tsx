@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
+import CreatorInsights from '../components/CreatorInsights';
+
 
 const Stat = ({ label, value }: { label: string; value: number | string }) => (
   <View style={s.stat}>
@@ -40,7 +42,7 @@ export default function EarningsScreen({ onBack }: { onBack: () => void }) {
             <Stat label="Gifts (30d)" value={d.giftCount30d} />
             <Stat label="Gifts (lifetime)" value={d.lifetimeGifts} />
           </View>
-
+              <CreatorInsights />
           <Text style={s.section}>Last 7 days</Text>
           <View style={s.chart}>
             {d.daily.map((x: any) => (

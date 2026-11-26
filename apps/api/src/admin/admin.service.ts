@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LivekitService } from '../livekit/livekit.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { MediaService } from '../media/media.service';
+import { PushService } from '../push/push.service';
 
 const SEVERE = ['UNDERAGE', 'NONCONSENSUAL', 'ILLEGAL'];
 
@@ -11,8 +13,10 @@ const SEVERE = ['UNDERAGE', 'NONCONSENSUAL', 'ILLEGAL'];
 export class AdminService {
   constructor(
     private prisma: PrismaService,
-    private livekit: LivekitService,
-    private mod: ModerationService,
+  private livekit: LivekitService,
+  private mod: ModerationService,
+  private media: MediaService,
+  private push: PushService,
   ) {}
 
   private audit(adminId: string, action: string, targetType: string, targetId: string, note?: string) {
@@ -20,35 +24,117 @@ export class AdminService {
   }
 
   async overview(adminId: string) {
-    await this.mod.requireAdmin(adminId);
-    const [openReports, severeReports, liveStreams, pendingPayouts, pendingAgg, pendingApplications] = await Promise.all([
-      this.prisma.report.count({ where: { status: 'OPEN' } }),
-      this.prisma.report.count({ where: { status: 'OPEN', reason: { in: SEVERE } } }),
-      this.prisma.stream.count({ where: { status: 'LIVE' } }),
-      this.prisma.payoutRequest.count({ where: { status: 'PENDING' } }),
-      this.prisma.payoutRequest.aggregate({ where: { status: 'PENDING' }, _sum: { diamonds: true, amountCents: true } }),
-      this.prisma.creatorApplication.count({ where: { status: 'PENDING' } }),
-    ]);
-    return {
-      openReports,
-      severeReports,
-      liveStreams,
-      pendingPayouts,
-      pendingApplications,
-      pendingPayoutDiamonds: pendingAgg._sum.diamonds ?? 0,
-      pendingPayoutCents: pendingAgg._sum.amountCents ?? 0,
-    };
-  }
+  await this.mod.requireAdmin(adminId);
+  const [
+    openReports, severeReports, liveStreams, pendingPayouts, pendingAgg,
+    pendingApplications, pendingRefunds, flaggedContent,
+  ] = await Promise.all([
+    this.prisma.report.count({ where: { status: 'OPEN' } }),
+    this.prisma.report.count({ where: { status: 'OPEN', reason: { in: SEVERE } } }),
+    this.prisma.stream.count({ where: { status: 'LIVE' } }),
+    this.prisma.payoutRequest.count({ where: { status: 'PENDING' } }),
+    this.prisma.payoutRequest.aggregate({ where: { status: 'PENDING' }, _sum: { diamonds: true, amountCents: true } }),
+    this.prisma.creatorApplication.count({ where: { status: 'PENDING' } }),
+    this.prisma.refundRequest.count({ where: { status: 'PENDING' } }),
+    this.prisma.mediaItem.count({ where: { status: 'FLAGGED' } }),
+  ]);
+  return {
+    openReports,
+    severeReports,
+    liveStreams,
+    pendingPayouts,
+    pendingApplications,
+    pendingRefunds,
+    flaggedContent,
+    pendingPayoutDiamonds: pendingAgg._sum.diamonds ?? 0,
+    pendingPayoutCents: pendingAgg._sum.amountCents ?? 0,
+  };
+}
 
   reports(adminId: string) {
     return this.mod.listReports(adminId);
   }
 
-  async resolveReport(adminId: string, id: string, note?: string) {
-    const r = await this.mod.resolveReport(adminId, id);
-    await this.audit(adminId, 'REPORT_RESOLVE', 'Report', id, note);
-    return r;
+async resolveReport(adminId: string, id: string, dto: { action?: string; note?: string } = {}) {
+  await this.mod.requireAdmin(adminId);
+  const report = await this.prisma.report.findUnique({ where: { id } });
+  if (!report) throw new NotFoundException('Report not found');
+  if (report.status !== 'OPEN') return { ok: true, already: true };
+
+  const action = dto.action ?? 'DISMISS';
+  const note = dto.note?.trim() || undefined;
+  let resolution: string;
+
+  switch (action) {
+    case 'REMOVE_CONTENT':
+      if (!report.mediaId) throw new BadRequestException('This report is not about a piece of content');
+      // Removal also opens refund cases for buyers and tells the creator.
+      await this.media.review(adminId, report.mediaId, 'REMOVED', note ?? `Report: ${report.reason}`);
+      resolution = 'CONTENT_REMOVED';
+      break;
+    case 'END_STREAM':
+      if (!report.streamId) throw new BadRequestException('This report is not about a stream');
+      await this.mod.adminEndStream(adminId, report.streamId);
+      resolution = 'STREAM_ENDED';
+      break;
+    case 'SUSPEND':
+      await this.suspend(adminId, report.targetUserId, note ?? `Report: ${report.reason}`);
+      resolution = 'USER_SUSPENDED';
+      break;
+    case 'WARN':
+      await this.push
+        .notifyUser(
+          report.targetUserId, 'Community guidelines warning',
+          note ?? 'A report about your account or content was reviewed. Please follow the community guidelines.',
+          { type: 'warning' }, 'default', 'warning',
+        )
+        .catch(() => undefined);
+      resolution = 'WARNED';
+      break;
+    case 'DISMISS':
+      resolution = 'DISMISSED';
+      break;
+    default:
+      throw new BadRequestException('Unknown action');
   }
+
+  // Removing content closes every open report about that item; other actions close just this one.
+  const scope =
+    action === 'REMOVE_CONTENT' && report.mediaId
+      ? { mediaId: report.mediaId, status: 'OPEN' as const }
+      : { id, status: 'OPEN' as const };
+  const closing = await this.prisma.report.findMany({ where: scope, select: { reporterId: true } });
+  await this.prisma.report.updateMany({
+    where: scope,
+    data: { status: 'RESOLVED', resolution, adminNote: note ?? null, resolvedBy: adminId, resolvedAt: new Date() },
+  });
+
+  // Hidden content comes back when nothing else is open against it.
+  if (report.mediaId && (action === 'DISMISS' || action === 'WARN')) {
+    const stillOpen = await this.prisma.report.count({ where: { mediaId: report.mediaId, status: 'OPEN' } });
+    if (stillOpen === 0) {
+      await this.prisma.mediaItem.updateMany({
+        where: { id: report.mediaId, status: 'FLAGGED' }, data: { status: 'APPROVED' },
+      });
+    }
+  }
+
+  await this.audit(adminId, 'REPORT_RESOLVE', 'Report', id, `${resolution}${note ? `: ${note}` : ''}`);
+
+  await Promise.race([
+    this.push.notifyMany(
+      [...new Set(closing.map((c) => c.reporterId))],
+      'Report reviewed',
+      resolution === 'DISMISSED'
+        ? 'We reviewed your report and found no violation.'
+        : 'We reviewed your report and took action. Thank you for helping keep Peach Live safe.',
+      { type: 'report' }, { storeAs: 'report' },
+    ),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]).catch(() => undefined);
+
+  return { ok: true, resolution };
+}
 
   async liveStreams(adminId: string) {
     await this.mod.requireAdmin(adminId);
