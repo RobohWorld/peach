@@ -41,6 +41,8 @@ enum LedgerKind {
   CONTENT_SALE
   SUBSCRIPTION_CHARGE
   SUBSCRIPTION_EARNING
+  CONTENT_REFUND
+  CONTENT_CLAWBACK
 }
 
 model User {
@@ -85,9 +87,8 @@ model Stream {
   endedAt         DateTime?
   ledger          LedgerEntry[]
 
- 
-  category   String?
-  tags       String[] @default([])
+  category String?
+  tags     String[] @default([])
 
   @@index([status, startedAt, category])
 }
@@ -95,7 +96,7 @@ model Stream {
 model Notification {
   id        String    @id @default(uuid())
   userId    String
-  type      String    // live | friend | chat
+  type      String // live | friend | chat
   title     String
   body      String
   data      Json?
@@ -265,12 +266,12 @@ model PushToken {
   @@index([userId])
 }
 
-enum FriendStatus { 
+enum FriendStatus {
   PENDING
   ACCEPTED
   DECLINED
   BLOCKED
-  }
+}
 
 model Friendship {
   id          String       @id @default(uuid())
@@ -278,6 +279,7 @@ model Friendship {
   addresseeId String
   status      FriendStatus @default(PENDING)
   createdAt   DateTime     @default(now())
+
   @@unique([requesterId, addresseeId])
   @@index([addresseeId, status])
 }
@@ -289,21 +291,23 @@ model DirectMessage {
   text         String
   createdAt    DateTime  @default(now())
   readAt       DateTime?
+
   @@index([friendshipId, createdAt])
 }
 
 model MediaItem {
-  id         String   @id @default(uuid())
-  creatorId  String
-  type       String   // IMAGE | VIDEO
-  r2Key      String
-  previewKey String?
-  title      String
-  priceCoins Int?     // null = not sold individually
-  minTier    Int?     // null = no subscriber access, 1-3 = lowest tier with access
+  id          String   @id @default(uuid())
+  creatorId   String
+  type        String // IMAGE | VIDEO
+  r2Key       String
+  previewKey  String?
+  title       String
+  priceCoins  Int? // null = not sold individually
+  minTier     Int? // null = no subscriber access, 1-3 = lowest tier with access
   durationSec Int?
-  status     String   @default("PENDING") // PENDING | APPROVED | REMOVED
-  createdAt  DateTime @default(now())
+  status      String   @default("PENDING") // PENDING | APPROVED | REMOVED
+  createdAt   DateTime @default(now())
+
   @@index([creatorId, createdAt])
 }
 
@@ -313,6 +317,7 @@ model MediaPurchase {
   mediaId   String
   coinsPaid Int
   createdAt DateTime @default(now())
+
   @@unique([userId, mediaId])
 }
 
@@ -320,11 +325,40 @@ model Subscription {
   id               String   @id @default(uuid())
   subscriberId     String
   creatorId        String
-  tier             Int      // 1 = 10K, 2 = 25K, 3 = 50K
+  tier             Int // 1 = 10K, 2 = 25K, 3 = 50K
   nextTier         Int?
   status           String   @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED
   currentPeriodEnd DateTime
   createdAt        DateTime @default(now())
+
   @@unique([subscriberId, creatorId])
   @@index([status, currentPeriodEnd])
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model RefundRequest {
+  id               String       @id @default(uuid())
+  purchaseId       String       @unique
+  userId           String
+  mediaId          String
+  creatorId        String
+  coins            Int
+  source           String // CREATOR_REMOVED | ADMIN_REMOVED
+  reason           String?
+  status           RefundStatus @default(PENDING)
+  rootCause        String?
+  adminNote        String?
+  clawbackDiamonds Int          @default(0)
+  createdAt        DateTime     @default(now())
+  decidedAt        DateTime?
+  decidedBy        String?
+
+  @@index([status, createdAt])
+  @@index([mediaId, status])
+  @@index([userId, createdAt])
 }

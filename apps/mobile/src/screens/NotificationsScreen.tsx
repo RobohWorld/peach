@@ -39,7 +39,7 @@ export default function NotificationsScreen({ onBack, onOpen }: {
         data={items}
         keyExtractor={(i) => i.id}
         onEndReached={() => { if (cursor) load(cursor); }}
-        ListEmptyComponent={loaded ? <Text style={s.muted}>Nothing yet. Follow creators to get live alerts here.</Text> : null}
+        ListEmptyComponent={loaded ? <Text style={s.muted}>Nothing yet. Follow creators to get live alerts here.</Text> : undefined}
         contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
         renderItem={({ item }) => (
           <Pressable style={[s.row, !item.readAt && s.unread]} onPress={() => onOpen(item.data)}>

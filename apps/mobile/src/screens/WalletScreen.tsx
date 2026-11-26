@@ -15,6 +15,8 @@ const KIND_LABEL: Record<string, string> = {
   SUBSCRIPTION_EARNING: 'Subscriber earnings',
   PAYOUT: 'Payout',
   ADJUSTMENT: 'Adjustment',
+  CONTENT_REFUND: 'Content refund',
+CONTENT_CLAWBACK: 'Refund adjustment',
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US');

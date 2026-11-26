@@ -81,7 +81,7 @@ export class FriendsService {
   private async notify(userId: string, title: string, body: string) {
     // Never let a slow push service block the API response.
     await Promise.race([
-      this.push.notifyUser(userId, title, body, { type: 'friend' }, 'chat').catch(() => undefined),
+     this.push.notifyUser(userId, title, body, { type: 'friend' }, 'friend').catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
   }

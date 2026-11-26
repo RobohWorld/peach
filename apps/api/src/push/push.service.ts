@@ -90,6 +90,8 @@ export class PushService {
   /**
    * Push to all of one user's registered devices
    * (friend requests, chat messages).
+   *
+   * Optionally stores the notification in the inbox.
    */
   async notifyUser(
     userId: string,
@@ -97,7 +99,15 @@ export class PushService {
     body: string,
     data: Record<string, unknown> = {},
     channelId = 'default',
+    storeAs?: string,
   ) {
+    if (storeAs) {
+      await this.store([userId], storeAs, title, body, data)
+        .catch((e) =>
+          this.log.warn(`inbox store failed: ${(e as Error).message}`),
+        );
+    }
+
     const tokens = await this.prisma.pushToken.findMany({
       where: { userId },
       select: { token: true },
@@ -116,6 +126,53 @@ export class PushService {
         data,
       })),
     );
+  }
+
+  /**
+   * One inbox row per user plus a single batched push.
+   * Use this instead of looping notifyUser.
+   */
+  async notifyMany(
+    userIds: string[],
+    title: string,
+    body: string,
+    data: Record<string, unknown> = {},
+    opts: { storeAs?: string; channelId?: string } = {},
+  ) {
+    const ids = [...new Set(userIds)].slice(0, 5000);
+
+    if (ids.length === 0) {
+      return { users: 0, devices: 0 };
+    }
+
+    if (opts.storeAs) {
+      await this.store(ids, opts.storeAs, title, body, data)
+        .catch((e) =>
+          this.log.warn(`inbox store failed: ${(e as Error).message}`),
+        );
+    }
+
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId: { in: ids } },
+      select: { token: true },
+      take: 10000,
+    });
+
+    await this.send(
+      tokens.map((t) => ({
+        to: t.token,
+        title,
+        body,
+        sound: 'default',
+        channelId: opts.channelId ?? 'default',
+        data,
+      })),
+    );
+
+    return {
+      users: ids.length,
+      devices: tokens.length,
+    };
   }
 
   async notifyFollowersLive(

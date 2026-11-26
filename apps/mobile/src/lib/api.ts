@@ -12,9 +12,11 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const m = data?.message;
-    throw new Error(m ? (Array.isArray(m) ? m.join(', ') : m) : `HTTP ${res.status}`);
-  }
+if (!res.ok) {
+  const m = data?.message;
+  const err: any = new Error(m ? (Array.isArray(m) ? m.join(', ') : m) : `HTTP ${res.status}`);
+  err.status = res.status;
+  throw err;
+}
   return data as T;
 }

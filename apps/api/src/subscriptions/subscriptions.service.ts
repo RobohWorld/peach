@@ -26,7 +26,7 @@ export class SubscriptionsService {
 
   private async notify(userId: string, title: string, body: string) {
     await Promise.race([
-      this.push.notifyUser(userId, title, body, { type: 'subscription' }, 'chat').catch(() => undefined),
+      this.push.notifyUser(userId, title, body, { type: 'subscription' }, 'subscription').catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
   }

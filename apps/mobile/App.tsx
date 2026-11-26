@@ -87,23 +87,28 @@ function Shell() {
     registerForPush().catch(() => {});
   };
 
-  useEffect(() => {
-    (async () => {
-      const saved = storage.get('token');
+useEffect(() => {
+  (async () => {
+    const saved = storage.get('token');
+    if (!saved) return setScreen({ name: 'login' });
+    setToken(saved);
 
-      if (!saved) return setScreen({ name: 'login' });
-
-      setToken(saved);
-
+    for (let attempt = 0; ; attempt++) {
       try {
         await afterLogin();
-      } catch {
-        setToken(null);
-        storage.del('token');
-        setScreen({ name: 'login' });
+        return;
+      } catch (e: any) {
+        if (e?.status === 401 || e?.status === 403) {   // token really is invalid or expired
+          setToken(null);
+          storage.del('token');
+          return setScreen({ name: 'login' });
+        }
+        if (attempt >= 2) return setScreen({ name: 'login' }); // offline: keep the token, retry next launch
+        await new Promise((r) => setTimeout(r, 1500));
       }
-    })();
-  }, []);
+    }
+  })();
+}, []);
 
   const watchStream = async (streamId: string) => {
     try {
@@ -120,9 +125,11 @@ function Shell() {
     }
   };
 
-  const openNotification = (d: any) => {
+const openNotification = (d: any) => {
   if (d?.type === 'live' && d.streamId) watchStream(String(d.streamId));
   else if (d?.type === 'friend' || d?.type === 'chat') { setTab('chat'); setScreen({ name: 'home' }); }
+  else if (d?.type === 'refund') setScreen({ name: 'wallet' });
+  else if (d?.username) openProfile(String(d.username));   // new content, unlocks, approvals
 };
 
   // Tapping a notification: live opens the stream.
@@ -133,6 +140,7 @@ function Shell() {
     return onNotificationTap((d) => {
       if (d?.type === 'live' && d.streamId) {
         watchStream(String(d.streamId));
+        
       } else if (d?.type === 'chat' || d?.type === 'friend') {
         setTab('chat');
         setChatTarget(
@@ -140,6 +148,12 @@ function Shell() {
         );
         setScreen({ name: 'home' });
       }
+      else if (d?.type === 'refund') {
+  setScreen({ name: 'wallet' });
+} else if (d?.username) {
+  openProfile(String(d.username));
+}
+      
     });
   }, [me?.id]);
 

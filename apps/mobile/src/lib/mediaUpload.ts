@@ -16,6 +16,16 @@ export type Picked = {
   durationSec?: number;
 };
 
+import * as VideoThumbnails from 'expo-video-thumbnails';
+
+async function videoPreviewUri(uri: string): Promise<string | undefined> {
+  if (Platform.OS === 'web') return undefined;          // not supported on web: falls back to the 🎬 placeholder
+  try {
+    const { uri: frame } = await VideoThumbnails.getThumbnailAsync(uri, { time: 500, quality: 0.5 });
+    return await toJpeg(frame, PREVIEW_WIDTH, 0.5);     // same 48px blur-source as photos
+  } catch { return undefined; }                          // a failed thumbnail never blocks the upload
+}
+
 // Works with both the newer and the older expo-image-manipulator API.
 async function toJpeg(uri: string, width: number | undefined, compress: number): Promise<string> {
   const M: any = ImageManipulator;
@@ -82,6 +92,9 @@ export async function uploadMedia(
     mainUri = await toJpeg(p.uri, p.width && p.width > MAX_IMAGE_WIDTH ? MAX_IMAGE_WIDTH : undefined, 0.85);
     previewUri = await toJpeg(p.uri, PREVIEW_WIDTH, 0.5);
     contentType = 'image/jpeg';
+  }
+  else {
+    previewUri = await videoPreviewUri(p.uri);
   }
 
   const mainBlob = await (await fetch(mainUri)).blob();
