@@ -43,6 +43,7 @@ const [tagText, setTagText] = useState('');
             <Text style={s.title}>Start a live stream</Text>
             <TextInput style={s.input} placeholder="Stream title" placeholderTextColor={colors.muted}
               value={title} onChangeText={setTitle} maxLength={80} />
+              <Text style={s.muted}>By going live you agree to follow the Community Guidelines.</Text>
             <Btn label="Go live" onPress={start} disabled={busy} />
           </>
         ) : (

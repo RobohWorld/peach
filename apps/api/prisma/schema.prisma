@@ -46,22 +46,24 @@ enum LedgerKind {
 }
 
 model User {
-  ageSource     String?
-  realName      String?
-  ageDeclaredAt DateTime?
-  suspendedAt   DateTime?
-  suspendReason String?
-  id            String          @id @default(uuid())
-  googleId      String          @unique
-  email         String          @unique
-  name          String
-  avatarUrl     String?
-  role          Role            @default(VIEWER)
-  ageVerified   Boolean         @default(false)
-  createdAt     DateTime        @default(now())
-  wallet        Wallet?
-  creator       CreatorProfile?
-  streams       Stream[]
+  ageSource       String?
+  realName        String?
+  ageDeclaredAt   DateTime?
+  suspendedAt     DateTime?
+  suspendReason   String?
+  id              String          @id @default(uuid())
+  googleId        String          @unique
+  email           String          @unique
+  name            String
+  avatarUrl       String?
+  role            Role            @default(VIEWER)
+  ageVerified     Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  wallet          Wallet?
+  creator         CreatorProfile?
+  streams         Stream[]
+  rulesVersion    Int?
+  rulesAcceptedAt DateTime?
 }
 
 model CreatorProfile {

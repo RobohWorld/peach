@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LivekitService } from '../livekit/livekit.service';
 import { PushService } from '../push/push.service';
+import { RULES_VERSION } from '../common/rules';
 
 @Injectable()
 export class StreamsService {
@@ -193,6 +194,10 @@ export class StreamsService {
     if (user.role !== 'CREATOR') {
       throw new ForbiddenException('Creator account required');
     }
+
+    if ((user.rulesVersion ?? 0) < RULES_VERSION) {
+  throw new ForbiddenException('Please accept the community guidelines first');
+}
 
     if (!user.ageVerified || user.creator?.kycStatus !== 'APPROVED') {
       throw new ForbiddenException('Age verification and KYC required');

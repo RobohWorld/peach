@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RULES_VERSION } from '../common/rules';
 
 @Injectable()
 export class ApplicationsService {
@@ -18,6 +19,9 @@ export class ApplicationsService {
   async apply(userId: string, dto: { username: string; bio?: string }) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!user.ageVerified && !user.ageDeclaredAt) throw new ForbiddenException('Confirm your age first');
+    if ((user.rulesVersion ?? 0) < RULES_VERSION) {
+  throw new ForbiddenException('Please accept the community guidelines first');
+}
     if (user.role !== 'VIEWER') throw new BadRequestException('Your account is already a creator or admin account');
 
     const username = dto.username.toLowerCase();
@@ -51,7 +55,7 @@ export class ApplicationsService {
     return rows.map((r) => ({ ...r, user: byId.get(r.userId) }));
   }
 
-  /** Approving means YOU checked this person is 18+ and who they say they are (manual placeholder for ID verification). */
+  
   async approve(adminId: string, id: string, note?: string) {
     await this.requireAdmin(adminId);
     try {

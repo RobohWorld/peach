@@ -23,7 +23,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (token: string) => v
   return (
     <View style={s.wrap}>
       <Text style={s.logo}>🍑 Peach Live</Text>
-      <Text style={s.sub}>Adults only (18+). Sign in with Google to continue.</Text>
+      <Text style={s.sub}>Sign in with Google to continue.</Text>
       <GoogleButton onToken={google} />
       <Text style={s.fine}>
         {USE_GOOGLE_BIRTHDAY

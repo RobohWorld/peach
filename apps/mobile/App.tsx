@@ -3,10 +3,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   View,
+  Image,
   KeyboardAvoidingView,
   BackHandler,
 } from 'react-native';
-
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import {
   SafeAreaProvider,
@@ -48,6 +49,9 @@ import {
 } from './src/lib/push';
 
 import { colors } from './src/lib/ui';
+import GuidelinesScreen from './src/screens/GuidelinesScreen';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 type Screen =
   | { name: 'boot' }
@@ -64,11 +68,16 @@ type Screen =
   | { name: 'profile'; username: string }
   | { name: 'leaderboard' }
   | { name: 'room'; session: any }
-  | { name: 'notifications' };
+  | { name: 'notifications' }
+   | { name: 'rules' }
+  | { name: 'guidelines' };
 
 const needsAge = (m: any) => !m.ageVerified && !m.ageDeclaredAt;
 
 function Shell() {
+  const hideNativeSplash = useCallback(() => {
+  SplashScreen.hideAsync().catch(() => {});
+}, []);
   const insets = useSafeAreaInsets();
   const kbOpen = useKeyboardVisible();
   const L = useLayout();
@@ -87,6 +96,10 @@ function Shell() {
 
     if (needsAge(m)) {
       setScreen({ name: 'age' });
+      return;
+    }
+     if (!m.rulesAccepted) {
+      setScreen({ name: 'rules' });
       return;
     }
 
@@ -243,7 +256,7 @@ function Shell() {
         }
 
         if (
-          ['boot', 'login', 'age', 'room'].includes(screen.name)
+          ['boot', 'login', 'age', 'rules', 'room'].includes(screen.name)
         ) {
           return false;
         }
@@ -275,16 +288,32 @@ function Shell() {
       >
         <StatusBar style="light" />
 
-        {screen.name === 'boot' && (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-            }}
-          >
-            <ActivityIndicator color={colors.peach} />
-          </View>
-        )}
+   {screen.name === 'boot' && (
+  <View
+    onLayout={hideNativeSplash}
+    style={{
+      position: 'absolute',
+      top: -insets.top,
+      bottom: -insets.bottom,
+      left: -insets.left,
+      right: -insets.right,
+      backgroundColor: '#302477',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+      elevation: 1000,
+    }}
+  >
+    <Image
+      source={require('./assets/splash-icon.png')}
+      style={{
+        width: '100%',
+        height: '100%',
+      }}
+      resizeMode="contain"
+    />
+  </View>
+)}
 
         {screen.name === 'login' && (
           <LoginScreen
@@ -309,6 +338,19 @@ function Shell() {
             onLogout={logout}
           />
         )}
+
+        {screen.name === 'rules' && (
+  <GuidelinesScreen
+    onAccept={async () => {
+      await api('/auth/accept-rules', { method: 'POST', body: { version: me?.rulesRequired ?? 1 } });
+      await afterLogin();
+    }}
+    onLogout={logout}
+  />
+)}
+
+{screen.name === 'guidelines' && 
+<GuidelinesScreen onBack={home} />}
 
         {screen.name === 'home' && (
           <View
@@ -367,7 +409,10 @@ function Shell() {
 
               {tab === 'me' && (
                 <MeScreen
-                  onOpenWallet={() =>
+
+                 onOpenGuidelines={() => 
+                  setScreen({ name: 'guidelines' })}
+                   onOpenWallet={() =>
                     setScreen({ name: 'wallet' })
                   }
                   onOpenLibrary={() =>
@@ -390,6 +435,7 @@ function Shell() {
                   }
                   onOpenProfile={openProfile}
                   onLogout={logout}
+                  
                 />
               )}
             </View>

@@ -5,11 +5,13 @@ import { api } from '../lib/api';
 import { colors } from '../lib/ui';
 
 const REASONS: [string, string][] = [
+  ['NUDITY_SEXUAL', 'Nudity or sexual content'],
+  ['HARASSMENT', 'Harassment or hate'],
+  ['VIOLENCE', 'Violence or dangerous acts'],
+  ['SELF_HARM', 'Self-harm'],
+  ['UNDERAGE', 'Someone under 18'],
+  ['ILLEGAL', 'Illegal activity'],
   ['SPAM', 'Spam or scam'],
-  ['HARASSMENT', 'Harassment'],
-  ['UNDERAGE', 'Looks under 18'],
-  ['NONCONSENSUAL', 'Shared without consent'],
-  ['ILLEGAL', 'Illegal content'],
   ['OTHER', 'Something else'],
 ];
 

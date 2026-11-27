@@ -16,8 +16,9 @@ type FeedItem = {
 };
 
 const REASONS: [string, string][] = [
-  ['SPAM', 'Spam'], ['HARASSMENT', 'Harassment'], ['UNDERAGE', 'Underage'],
-  ['NONCONSENSUAL', 'Non-consensual'], ['ILLEGAL', 'Illegal'], ['OTHER', 'Other'],
+  ['NUDITY_SEXUAL', 'Nudity/sexual'], ['HARASSMENT', 'Harassment'], ['VIOLENCE', 'Violence'],
+  ['SELF_HARM', 'Self-harm'], ['UNDERAGE', 'Underage'], ['ILLEGAL', 'Illegal'],
+  ['SPAM', 'Spam'], ['OTHER', 'Other'],
 ];
 const SLOW_OPTIONS: [number, string][] = [[0, 'Off'], [5, '5s'], [15, '15s'], [30, '30s']];
 

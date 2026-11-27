@@ -55,7 +55,7 @@ export default function ApplyScreen({ onBack }: { onBack: () => void }) {
 
       {canApply && (
         <View style={s.card}>
-          <Text style={s.muted}>Creators must be 18+. Approval needs a manual check of your age and identity.</Text>
+          <Text style={s.muted}>Creators must be 18+ and follow the Community Guidelines. Approval needs a manual check of your age and identity.</Text>
           <TextInput style={s.input} placeholder="Username (3-20 letters, numbers, _)" placeholderTextColor={colors.muted}
             autoCapitalize="none" value={username} onChangeText={setUsername} maxLength={20} />
           <TextInput style={[s.input, { height: 90 }]} placeholder="Short bio (optional)" placeholderTextColor={colors.muted}

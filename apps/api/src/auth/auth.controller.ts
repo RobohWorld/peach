@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../common/current-user.decorator';
@@ -14,6 +14,10 @@ class ConfirmAgeDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Use the format YYYY-MM-DD' })
   birthDate: string;
 }
+
+class AcceptRulesDto { @IsInt() @Min(1) version: number; }
+
+
 
 @Controller('auth')
 export class AuthController {
@@ -38,4 +42,11 @@ export class AuthController {
   confirmAge(@CurrentUser() user: AuthUser, @Body() dto: ConfirmAgeDto) {
     return this.auth.confirmAge(user.id, dto.birthDate);
   }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+@UseGuards(JwtAuthGuard)
+@Post('accept-rules')
+acceptRules(@CurrentUser() user: AuthUser, @Body() dto: AcceptRulesDto) {
+  return this.auth.acceptRules(user.id, dto.version);
+}
 }

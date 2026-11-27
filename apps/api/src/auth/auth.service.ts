@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
+import { RULES_VERSION } from '../common/rules';
 
 type GoogleLogin = { idToken?: string; accessToken?: string; code?: string };
 type AgeStatus = 'ADULT' | 'MINOR' | 'UNKNOWN';
@@ -131,12 +132,23 @@ export class AuthService {
     return { accessToken: accessJwt, user, ageStatus };
   }
 
-  me(userId: string) {
-    return this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      include: { wallet: true, creator: true },
-    });
-  }
+ async me(userId: string) {
+  const u = await this.prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    include: { wallet: true, creator: true },
+  });
+  return { ...u, rulesAccepted: (u.rulesVersion ?? 0) >= RULES_VERSION, rulesRequired: RULES_VERSION };
+}
+
+// add:
+async acceptRules(userId: string, version: number) {
+  if (version !== RULES_VERSION) throw new BadRequestException('These guidelines changed, please reload the app');
+  await this.prisma.user.update({
+    where: { id: userId },
+    data: { rulesVersion: RULES_VERSION, rulesAcceptedAt: new Date() },
+  });
+  return { ok: true };
+}
 
   async confirmAge(userId: string, birthDate: string) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);

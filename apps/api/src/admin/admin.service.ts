@@ -7,7 +7,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { MediaService } from '../media/media.service';
 import { PushService } from '../push/push.service';
 
-const SEVERE = ['UNDERAGE', 'NONCONSENSUAL', 'ILLEGAL'];
+const SEVERE = ['NUDITY_SEXUAL', 'VIOLENCE', 'SELF_HARM', 'UNDERAGE', 'ILLEGAL', 'NONCONSENSUAL'];
 
 @Injectable()
 export class AdminService {

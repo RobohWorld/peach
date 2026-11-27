@@ -66,6 +66,16 @@
       ],
       "expo-notifications",
       "expo-sqlite"
+
+      ,[
+  "expo-splash-screen",
+  {
+    "image": "./assets/splash-icon.png",
+    "imageWidth": 300,
+    "resizeMode": "contain",
+    "backgroundColor": "#302477"
+  }
+]
     ],
     "extra": {
       "eas": {

@@ -7,10 +7,11 @@ import { colors } from '../lib/ui';
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export default function MeScreen({
-  onOpenWallet, onOpenLibrary, onOpenSubscriptions, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onLogout,
+  onOpenWallet, onOpenLibrary, onOpenSubscriptions, onOpenEarnings, onOpenPayouts, onOpenAdmin, onOpenApply, onOpenProfile, onLogout, onOpenGuidelines
 }: {
   onOpenWallet: () => void; onOpenLibrary: () => void; onOpenSubscriptions: () => void; onOpenEarnings: () => void; onOpenPayouts: () => void;
   onOpenAdmin: () => void; onOpenApply: () => void; onOpenProfile: (username: string) => void;
+  onOpenGuidelines: () => void;
   onLogout: () => void;
 }) {
   const [me, setMe] = useState<any>(null);
@@ -80,6 +81,7 @@ export default function MeScreen({
         </>
       )}
 
+      <Btn label="Community guidelines" onPress={onOpenGuidelines} outline />
       <Btn label="Log out" onPress={onLogout} outline />
     </ScrollView>
   );

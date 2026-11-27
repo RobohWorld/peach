@@ -12,15 +12,17 @@ import { LivekitService } from '../livekit/livekit.service';
 import { PushService } from '../push/push.service';
 
 export const REPORT_REASONS = [
-  'SPAM',
+  'NUDITY_SEXUAL',
   'HARASSMENT',
+  'VIOLENCE',
+  'SELF_HARM',
   'UNDERAGE',
-  'NONCONSENSUAL',
   'ILLEGAL',
+  'SPAM',
   'OTHER',
 ];
 
-const SEVERE = new Set(['UNDERAGE', 'NONCONSENSUAL', 'ILLEGAL']);
+const SEVERE = new Set(['NUDITY_SEXUAL', 'VIOLENCE', 'SELF_HARM', 'UNDERAGE', 'ILLEGAL', 'NONCONSENSUAL']);
 
 const MAX_REPORTS_PER_DAY = 20;
 const FLAG_AFTER_REPORTERS = 5;
