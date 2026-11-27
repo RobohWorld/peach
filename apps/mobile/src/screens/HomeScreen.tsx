@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -8,12 +7,20 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import { api } from '../lib/api';
 import { colors } from '../lib/ui';
+import { usePolling } from '../lib/usePolling';
+import { useLayout } from '../lib/useLayout';
+
 import WalletChip from '../components/WalletChip';
 import NotificationBell from '../components/NotificationBell';
+
+// Module-level cache: instant list when returning to Home.
+const feedCache: { live: any[] | null } = { live: null };
 
 const SORTS: [string, string][] = [
   ['popular', 'Popular'],
@@ -43,7 +50,13 @@ export default function HomeScreen({
   onOpenWallet: () => void;
   onOpenNotifications: () => void;
 }) {
-  const [live, setLive] = useState<any[]>([]);
+  const L = useLayout();
+
+  const [live, setLive] = useState<any[]>(feedCache.live ?? []);
+  const [loaded, setLoaded] = useState(feedCache.live !== null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dq, setDq] = useState('');
+
   const [creators, setCreators] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('popular');
@@ -51,9 +64,16 @@ export default function HomeScreen({
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Debounce search input.
+  useEffect(() => {
+    const t = setTimeout(() => setDq(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Load live streams and matching creators.
   const load = useCallback(async () => {
     try {
-      const term = q.trim();
+      const term = dq.trim();
       const searching = term.length >= 2;
 
       const qs = `sort=${sort}${category ? `&category=${category}` : ''}${searching ? `&q=${encodeURIComponent(term)}` : ''}`;
@@ -68,20 +88,26 @@ export default function HomeScreen({
       setLive(l);
       setCreators(c);
       setErr('');
+
+      if (!searching && sort === 'popular' && !category) {
+        feedCache.live = l;
+      }
     } catch (e: any) {
       setErr(e.message);
+    } finally {
+      setLoaded(true);
     }
-  }, [q, sort, category]);
+  }, [dq, sort, category]);
 
-  useEffect(() => {
-    const first = setTimeout(load, 350);
-    const poll = setInterval(load, 10000);
+  // Foreground-only polling.
+  usePolling(load, 10000, [load]);
 
-    return () => {
-      clearTimeout(first);
-      clearInterval(poll);
-    };
-  }, [load]);
+  // Pull to refresh.
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
   const watch = async (st: any) => {
     setBusy(true);
@@ -120,14 +146,19 @@ export default function HomeScreen({
         onChangeText={setQ}
       />
 
+      {/* Sort chips */}
       <View style={s.row}>
         {SORTS.map(([key, label]) => (
           <Pressable
             key={key}
             onPress={() => setSort(key)}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityState={{ selected: sort === key }}
             style={[s.chip, sort === key && s.chipOn]}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               style={[
                 s.chipText,
                 sort === key && { color: '#fff' },
@@ -139,6 +170,7 @@ export default function HomeScreen({
         ))}
       </View>
 
+      {/* Category chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -148,12 +180,16 @@ export default function HomeScreen({
           <Pressable
             key={key || 'all'}
             onPress={() => setCategory(key)}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityState={{ selected: category === key }}
             style={[
               s.chip,
               category === key && s.chipOn,
             ]}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               style={[
                 s.chipText,
                 category === key && { color: '#fff' },
@@ -167,6 +203,7 @@ export default function HomeScreen({
 
       {!!err && <Text style={s.err}>{err}</Text>}
 
+      {/* Creator search results */}
       {creators.length > 0 && (
         <>
           <Text style={s.section}>Creators</Text>
@@ -176,6 +213,7 @@ export default function HomeScreen({
               key={c.username}
               style={s.stream}
               onPress={() => onOpenProfile(c.username)}
+              accessibilityRole="button"
             >
               <Text style={s.name}>{c.name}</Text>
 
@@ -194,29 +232,53 @@ export default function HomeScreen({
 
   return (
     <FlatList
+      key={L.columns}
       style={s.wrap}
+      numColumns={L.columns}
+      columnWrapperStyle={
+        L.columns > 1 ? { gap: 10 } : undefined
+      }
       contentContainerStyle={{
         padding: 16,
-        gap: 8,
-        maxWidth: 520,
+        gap: 10,
+        maxWidth: L.contentMax,
         width: '100%',
         alignSelf: 'center',
       }}
       data={live}
       keyExtractor={(i) => i.id}
       ListHeaderComponent={header}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.peach}
+          colors={[colors.peach]}
+        />
+      }
       ListEmptyComponent={
-        <Text style={s.muted}>
-          {sort === 'following'
-            ? 'None of the creators you follow are live.'
-            : 'Nobody is live yet.'}
-        </Text>
+        loaded
+          ? (
+            <Text style={s.muted}>
+              {sort === 'following'
+                ? 'None of the creators you follow are live.'
+                : 'Nobody is live yet.'}
+            </Text>
+          )
+          : <ActivityIndicator color={colors.peach} />
       }
       renderItem={({ item }) => (
         <Pressable
-          style={s.stream}
+          style={[
+            s.stream,
+            L.columns > 1 && {
+              flex: 1,
+              maxWidth: `${100 / L.columns}%`,
+            },
+          ]}
           onPress={() => watch(item)}
           disabled={busy}
+          accessibilityRole="button"
         >
           <Text style={s.name}>🔴 {item.title}</Text>
 
@@ -230,7 +292,9 @@ export default function HomeScreen({
           {!!item.category && (
             <Text style={s.muted}>
               #{item.category}
-              {(item.tags ?? []).map((t: string) => ` #${t}`).join('')}
+              {(item.tags ?? []).map(
+                (t: string) => ` #${t}`
+              ).join('')}
             </Text>
           )}
 
@@ -244,6 +308,7 @@ export default function HomeScreen({
                 onPress={() =>
                   onOpenProfile(item.creator.username)
                 }
+                accessibilityRole="button"
               >
                 <Text style={s.link2}>View profile</Text>
               </Pressable>
@@ -259,29 +324,35 @@ const s = StyleSheet.create({
   header: {
     gap: 10,
   },
+
   top: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
   topRight: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
   },
+
   wrap: {
     flex: 1,
     backgroundColor: colors.bg,
   },
+
   logo: {
     color: colors.peach,
     fontSize: 24,
     fontWeight: '800',
   },
+
   link2: {
     color: colors.peach,
     fontWeight: '700',
   },
+
   row: {
     flexDirection: 'row',
     gap: 10,
@@ -289,49 +360,61 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
   },
+
   categoryList: {
     gap: 8,
   },
+
   name: {
     color: colors.text,
     fontWeight: '700',
     fontSize: 16,
   },
+
   muted: {
     color: colors.muted,
   },
+
   section: {
     color: colors.text,
     fontWeight: '700',
     fontSize: 18,
     marginTop: 8,
   },
+
   stream: {
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 14,
     gap: 4,
   },
+
   input: {
     backgroundColor: colors.card,
     color: colors.text,
     padding: 12,
     borderRadius: 10,
   },
+
   chip: {
     borderWidth: 1,
     borderColor: colors.peach,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minHeight: 40,
+    justifyContent: 'center',
   },
+
   chipOn: {
     backgroundColor: colors.peach,
   },
+
   chipText: {
     color: colors.peach,
     fontWeight: '700',
   },
+
   err: {
     color: colors.error,
   },

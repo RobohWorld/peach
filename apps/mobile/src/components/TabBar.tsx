@@ -4,10 +4,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardVisible } from '../lib/useKeyboardVisible';
 import { colors } from '../lib/ui';
+import { tap } from '../lib/haptics';
 
 export type Tab = 'home' | 'explore' | 'live' | 'chat' | 'me';
 
-const ITEMS: { key: Tab; label: string; icon: string }[] = [
+export const ITEMS: { key: Tab; label: string; icon: string }[] = [
   { key: 'home', label: 'Home', icon: '🏠' },
   { key: 'explore', label: 'Explore', icon: '🔎' },
   { key: 'live', label: 'Go Live', icon: '🎥' },
@@ -40,11 +41,15 @@ export default function TabBar({
         return (
           <Pressable
             key={it.key}
-            onPress={() => onChange(it.key)}
+            onPress={() => {
+              tap();
+              onChange(it.key);
+            }}
             style={s.item}
             hitSlop={6}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel={it.label}
+            accessibilityState={{ selected: on }}
           >
             <View style={[s.iconWrap, center && s.center, center && on && s.centerOn]}>
               <Text style={[s.icon, !on && !center && { opacity: 0.55 }]}>
@@ -60,7 +65,10 @@ export default function TabBar({
               )}
             </View>
 
-            <Text style={[s.label, on && s.labelOn]}>
+            <Text
+              style={[s.label, on && s.labelOn]}
+              maxFontSizeMultiplier={1.2}
+            >
               {it.label}
             </Text>
           </Pressable>

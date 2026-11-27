@@ -2,7 +2,7 @@
   "expo": {
     "name": "Peach Live",
     "slug": "peach-live",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.peachlive.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Peach Live needs the camera so you can go live.",
-        "NSMicrophoneUsageDescription": "Peach Live needs the microphone so you can go live."
+        "NSMicrophoneUsageDescription": "Peach Live needs the microphone so you can go live.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bitcode": false
     },

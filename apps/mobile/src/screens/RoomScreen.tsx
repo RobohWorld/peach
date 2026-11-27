@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { Alert, BackHandler, View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-native';
 import VideoRoom from '../components/VideoRoom';
 import GiftOverlay, { GiftEvent } from '../components/GiftOverlay';
 import Btn from '../components/Btn';
@@ -7,6 +7,8 @@ import FriendButton from '../components/FriendButton';
 import { api } from '../lib/api';
 import { useKeepAwake } from 'expo-keep-awake';
 import { colors } from '../lib/ui';
+import { useLayout } from '../lib/useLayout';
+import { tap, success } from '../lib/haptics';
 
 type FeedItem = {
   id: number; kind: 'chat' | 'gift' | 'system'; text: string;
@@ -24,6 +26,8 @@ export default function RoomScreen({ session, me, onLeave }: {
 }) {
   const isHost: boolean = session.publish;
   useKeepAwake();
+  const L = useLayout();
+  const split = L.width >= 800 && L.landscape;     // video left, chat and gifts right
   const streamId: string = session.stream.id;
   const seq = useRef(0);
   const leaving = useRef(false);
@@ -78,15 +82,16 @@ export default function RoomScreen({ session, me, onLeave }: {
     setTimeout(onLeave, 1800);
   };
 
-const sendGift = async (g: any) => {
-  if (sending) return;
-  setErr(''); setSending(true);
-  try {
-    const r = await api('/gifts/send', { method: 'POST', body: { streamId, giftId: g.id,
-      idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` } });
-    setCoins(r.coinBalance);
-  } catch (e: any) { setErr(e.message); } finally { setSending(false); }
-};
+  const sendGift = async (g: any) => {
+    if (sending) return;
+    setErr(''); setSending(true);
+    try {
+      const r = await api('/gifts/send', { method: 'POST', body: { streamId, giftId: g.id,
+        idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` } });
+      setCoins(r.coinBalance);
+      success();
+    } catch (e: any) { setErr(e.message); } finally { setSending(false); }
+  };
 
   const sendChat = async () => {
     const text = draft.trim();
@@ -131,6 +136,7 @@ const sendGift = async (g: any) => {
   const toggleFollow = async () => {
     const u = session.creator?.username;
     if (!u) return;
+    tap();
     const next = !following;
     setFollowing(next);
     try { await api(`/creators/${encodeURIComponent(u)}/${next ? 'follow' : 'unfollow'}`, { method: 'POST' }); }
@@ -145,150 +151,187 @@ const sendGift = async (g: any) => {
     onLeave();
   };
 
+  // Android back button: viewers leave, hosts confirm before ending the live.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isHost) {
+        Alert.alert('End your live?', 'Viewers will be disconnected.', [
+          { text: 'Keep streaming', style: 'cancel' },
+          { text: 'End', style: 'destructive', onPress: () => { leave(); } },
+        ]);
+      } else {
+        leave();
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
   const canActOn = selected && selected.userId && selected.userId !== me.id;
 
   return (
-    <View style={s.wrap}>
+    <View style={[s.wrap, { maxWidth: split ? 1100 : L.tablet ? 760 : 520 }]}>
       <View style={s.header}>
-        <Text style={s.title}>{session.stream.title} {isHost ? '(you are live)' : ''}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <Text style={s.title} numberOfLines={2}>{session.stream.title} {isHost ? '(you are live)' : ''}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {!isHost && !!session.creator?.username && (
-            <Pressable onPress={toggleFollow}><Text style={s.leave}>{following ? '❤ Following' : '♡ Follow'}</Text></Pressable>
+            <Pressable onPress={toggleFollow} style={s.hbtn} hitSlop={6} accessibilityRole="button"
+              accessibilityLabel={following ? 'Unfollow creator' : 'Follow creator'}>
+              <Text style={s.leave}>{following ? '❤ Following' : '♡ Follow'}</Text>
+            </Pressable>
           )}
           {!isHost && !!session.creator?.id && <FriendButton userId={session.creator.id} compact />}
-          <Pressable onPress={leave}><Text style={s.leave}>{isHost ? 'End' : 'Leave'}</Text></Pressable>
-        </View>
-      </View>
-
-      <View style={s.video}>
-        <VideoRoom
-          url={session.livekitUrl}
-          token={session.token}
-          publish={isHost}
-          onMessage={onMessage}
-          onDisconnected={onDisconnected}
-        />
-        <GiftOverlay events={effects} onDone={(id) => setEffects((e) => e.filter((x) => x.id !== id))} />
-      </View>
-
-      {isHost && (
-        <View style={s.rowWrap}>
-          <Text style={s.muted}>Slow mode:</Text>
-          {SLOW_OPTIONS.map(([sec, label]) => (
-            <Pressable key={sec} onPress={() => setSlowMode(sec)} style={[s.chip, slow === sec && s.chipOn]}>
-              <Text style={[s.chipText, slow === sec && { color: '#fff' }]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {!isHost && slow > 0 && <Text style={s.muted}>Slow mode: 1 message per {slow}s</Text>}
-
-      <ScrollView
-        ref={listRef}
-        style={s.chat}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-      >
-        {feed.map((f) => (
-          <Pressable
-            key={f.id}
-            disabled={f.kind !== 'chat'}
-            onPress={() => { setSelected(f); setReporting(false); }}
-          >
-            <Text style={[s.line, f.kind === 'gift' && s.gift, f.kind === 'system' && s.system]}>{f.text}</Text>
+          <Pressable onPress={leave} style={s.hbtn} hitSlop={6} accessibilityRole="button"
+            accessibilityLabel={isHost ? 'End live' : 'Leave stream'}>
+            <Text style={s.leave}>{isHost ? 'End' : 'Leave'}</Text>
           </Pressable>
-        ))}
-        {feed.length === 0 && <Text style={s.muted}>No messages yet. Tap a message to moderate, report or add friend.</Text>}
-      </ScrollView>
+        </View>
+      </View>
 
-      {canActOn && (
-        <View style={s.panel}>
-          <Text style={s.panelTitle}>{selected!.name}</Text>
-          {!reporting ? (
+      <View style={[s.body, split && { flexDirection: 'row' }]}>
+        <View style={split ? s.leftSplit : s.leftStack}>
+          <View style={s.video}>
+            <VideoRoom
+              url={session.livekitUrl}
+              token={session.token}
+              publish={isHost}
+              onMessage={onMessage}
+              onDisconnected={onDisconnected}
+            />
+            <GiftOverlay events={effects} onDone={(id) => setEffects((e) => e.filter((x) => x.id !== id))} />
+          </View>
+        </View>
+
+        <View style={split ? s.rightSplit : s.rightStack}>
+          {isHost && (
             <View style={s.rowWrap}>
-              {isHost && (
-                <>
-                  <View style={s.cell}><Btn label="Mute" onPress={() => modAction('mute')} outline /></View>
-                  <View style={s.cell}><Btn label="Unmute" onPress={() => modAction('unmute')} outline /></View>
-                  <View style={s.cell}><Btn label="Kick" onPress={() => modAction('kick')} outline /></View>
-                </>
-              )}
-              <View style={s.cell}><FriendButton key={selected!.userId} userId={selected!.userId} compact /></View>
-              <View style={s.cell}><Btn label="Report" onPress={() => setReporting(true)} outline /></View>
-              <View style={s.cell}><Btn label="Close" onPress={() => setSelected(null)} outline /></View>
-            </View>
-          ) : (
-            <View style={s.rowWrap}>
-              {REASONS.map(([val, label]) => (
-                <View key={val} style={s.cell}><Btn label={label} onPress={() => sendReport(val)} outline /></View>
+              <Text style={s.muted}>Slow mode:</Text>
+              {SLOW_OPTIONS.map(([sec, label]) => (
+                <Pressable key={sec} onPress={() => setSlowMode(sec)} hitSlop={4} accessibilityRole="button"
+                  accessibilityState={{ selected: slow === sec }} style={[s.chip, slow === sec && s.chipOn]}>
+                  <Text maxFontSizeMultiplier={1.2} style={[s.chipText, slow === sec && { color: '#fff' }]}>{label}</Text>
+                </Pressable>
               ))}
-              <View style={s.cell}><Btn label="Cancel" onPress={() => setReporting(false)} outline /></View>
+            </View>
+          )}
+          {!isHost && slow > 0 && <Text style={s.muted}>Slow mode: 1 message per {slow}s</Text>}
+
+          <ScrollView
+            ref={listRef}
+            style={split ? s.chatSplit : s.chat}
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          >
+            {feed.map((f) => (
+              <Pressable
+                key={f.id}
+                disabled={f.kind !== 'chat'}
+                onPress={() => { setSelected(f); setReporting(false); }}
+              >
+                <Text style={[s.line, f.kind === 'gift' && s.gift, f.kind === 'system' && s.system]}>{f.text}</Text>
+              </Pressable>
+            ))}
+            {feed.length === 0 && <Text style={s.muted}>No messages yet. Tap a message to moderate, report or add friend.</Text>}
+          </ScrollView>
+
+          {canActOn && (
+            <View style={s.panel}>
+              <Text style={s.panelTitle}>{selected!.name}</Text>
+              {!reporting ? (
+                <View style={s.rowWrap}>
+                  {isHost && (
+                    <>
+                      <View style={s.cell}><Btn label="Mute" onPress={() => modAction('mute')} outline /></View>
+                      <View style={s.cell}><Btn label="Unmute" onPress={() => modAction('unmute')} outline /></View>
+                      <View style={s.cell}><Btn label="Kick" onPress={() => modAction('kick')} outline /></View>
+                    </>
+                  )}
+                  <View style={s.cell}><FriendButton key={selected!.userId} userId={selected!.userId} compact /></View>
+                  <View style={s.cell}><Btn label="Report" onPress={() => setReporting(true)} outline /></View>
+                  <View style={s.cell}><Btn label="Close" onPress={() => setSelected(null)} outline /></View>
+                </View>
+              ) : (
+                <View style={s.rowWrap}>
+                  {REASONS.map(([val, label]) => (
+                    <View key={val} style={s.cell}><Btn label={label} onPress={() => sendReport(val)} outline /></View>
+                  ))}
+                  <View style={s.cell}><Btn label="Cancel" onPress={() => setReporting(false)} outline /></View>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={s.chatRow}>
+            <TextInput
+              style={s.input}
+              placeholder={muted ? 'You are muted' : 'Say something...'}
+              placeholderTextColor={colors.muted}
+              value={draft}
+              onChangeText={setDraft}
+              onSubmitEditing={sendChat}
+              editable={!muted}
+              maxLength={200}
+              accessibilityLabel="Chat message"
+            />
+            <View style={{ width: 80 }}><Btn label="Send" onPress={sendChat} disabled={!draft.trim() || muted} /></View>
+          </View>
+
+          {!!err && <Text style={s.err}>{err}</Text>}
+
+          {!isHost && (
+            <View style={{ gap: 6 }}>
+              <Text style={s.muted}>🪙 {coins === null ? '...' : Number(coins).toLocaleString()}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {gifts.map((g) => {
+                  const poor = coins !== null && coins < g.coinPrice;
+                  return (
+                    <Pressable key={g.id} onPress={() => sendGift(g)} disabled={poor || sending}
+                      accessibilityRole="button" accessibilityLabel={`Send ${g.name} for ${g.coinPrice} coins`}
+                      style={[s.tile, (poor || sending) && { opacity: 0.45 }]}>
+                      <Text style={s.tileEmoji}>{g.emoji ?? '🎁'}</Text>
+                      <Text style={s.tileName} numberOfLines={1} maxFontSizeMultiplier={1.2}>{g.name}</Text>
+                      <Text style={s.tilePrice} maxFontSizeMultiplier={1.2}>🪙 {Number(g.coinPrice).toLocaleString()}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
         </View>
-      )}
-
-      <View style={s.chatRow}>
-        <TextInput
-          style={s.input}
-          placeholder={muted ? 'You are muted' : 'Say something...'}
-          placeholderTextColor={colors.muted}
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={sendChat}
-          editable={!muted}
-          maxLength={200}
-        />
-        <View style={{ width: 80 }}><Btn label="Send" onPress={sendChat} disabled={!draft.trim() || muted} /></View>
       </View>
-
-      {!!err && <Text style={s.err}>{err}</Text>}
-
-    {!isHost && (
-  <View style={{ gap: 6 }}>
-    <Text style={s.muted}>🪙 {coins === null ? '...' : Number(coins).toLocaleString()}</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-      {gifts.map((g) => {
-        const poor = coins !== null && coins < g.coinPrice;
-        return (
-          <Pressable key={g.id} onPress={() => sendGift(g)} disabled={poor || sending}
-            accessibilityRole="button" accessibilityLabel={`Send ${g.name} for ${g.coinPrice} coins`}
-            style={[s.tile, (poor || sending) && { opacity: 0.45 }]}>
-            <Text style={s.tileEmoji}>{g.emoji ?? '🎁'}</Text>
-            <Text style={s.tileName} numberOfLines={1}>{g.name}</Text>
-            <Text style={s.tilePrice}>🪙 {Number(g.coinPrice).toLocaleString()}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  </View>
-)}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.bg, padding: 12, gap: 8, maxWidth: 520, width: '100%', alignSelf: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  wrap: { flex: 1, backgroundColor: colors.bg, padding: 12, gap: 8, width: '100%', alignSelf: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   title: { color: colors.text, fontWeight: '700', fontSize: 16, flex: 1 },
+  hbtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   leave: { color: colors.peach, fontWeight: '700' },
- video: { flex: 1, minHeight: 160, maxHeight: 360, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' },
-chat: { flexGrow: 0, flexShrink: 1, minHeight: 80, maxHeight: 150, backgroundColor: colors.card, borderRadius: 10, padding: 8 },
+  body: { flex: 1, gap: 8 },
+  leftStack: { flex: 1, minHeight: 160, maxHeight: 360 },
+  leftSplit: { flex: 2 },
+  rightStack: { flexShrink: 1, gap: 8 },
+  rightSplit: { flex: 1, gap: 8 },
+  video: { flex: 1, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' },
+  chat: { flexGrow: 0, flexShrink: 1, minHeight: 80, maxHeight: 150, backgroundColor: colors.card, borderRadius: 10, padding: 8 },
+  chatSplit: { flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 8 },
   line: { color: colors.text, paddingVertical: 2 },
   gift: { color: colors.peach, fontWeight: '700' },
   system: { color: colors.muted, fontStyle: 'italic' },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   cell: { minWidth: 100 },
-  chip: { borderWidth: 1, borderColor: colors.peach, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  chip: { borderWidth: 1, borderColor: colors.peach, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
   chipOn: { backgroundColor: colors.peach },
   chipText: { color: colors.peach, fontWeight: '700' },
   panel: { backgroundColor: colors.card, borderRadius: 10, padding: 10, gap: 8 },
   panelTitle: { color: colors.text, fontWeight: '700' },
   chatRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  input: { flex: 1, backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10 },
+  input: { flex: 1, backgroundColor: colors.card, color: colors.text, padding: 12, borderRadius: 10, minHeight: 44 },
   muted: { color: colors.muted },
   err: { color: colors.error },
   tile: { width: 84, minHeight: 72, backgroundColor: colors.card, borderRadius: 12, paddingVertical: 8, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: '#2c2438' },
-tileEmoji: { fontSize: 28 },
-tileName: { color: colors.text, fontSize: 12, fontWeight: '600', paddingHorizontal: 4 },
-tilePrice: { color: colors.peach, fontSize: 12, fontWeight: '800' },
+  tileEmoji: { fontSize: 28 },
+  tileName: { color: colors.text, fontSize: 12, fontWeight: '600', paddingHorizontal: 4 },
+  tilePrice: { color: colors.peach, fontSize: 12, fontWeight: '800' },
 });

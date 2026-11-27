@@ -13,15 +13,30 @@
         "EXPO_PUBLIC_API_URL": "https://peach-api-xi.vercel.app",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "145944634488-13qdcekvu08ho8u0o3lnnl78sd1p5gtd.apps.googleusercontent.com"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "autoIncrement": true
     },
+
+    "preview-simulator": {
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": { "simulator": true },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://peach-api-xi.vercel.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "145944634488-13qdcekvu08ho8u0o3lnnl78sd1p5gtd.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "145944634488-13qdcekvu08ho8u0o3lnnl78sd1p5gtd.apps.googleusercontent.com"
+      }
+    },
+
     "production": {
       "env": {
         "EXPO_PUBLIC_API_URL": "https://peach-api-xi.vercel.app",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "145944634488-13qdcekvu08ho8u0o3lnnl78sd1p5gtd.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "145944634488-13qdcekvu08ho8u0o3lnnl78sd1p5gtd.apps.googleusercontent.com",
         "EXPO_PUBLIC_DEV_LOGIN": "false"
       },
-      "channel": "production"
+      "channel": "production",
+      "autoIncrement": true
     }
   }
 }

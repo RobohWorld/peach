@@ -4,7 +4,9 @@ import {
   ActivityIndicator,
   View,
   KeyboardAvoidingView,
+  BackHandler,
 } from 'react-native';
+
 import { StatusBar } from 'expo-status-bar';
 import {
   SafeAreaProvider,
@@ -12,6 +14,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { useKeyboardVisible } from './src/lib/useKeyboardVisible';
+import { useLayout } from './src/lib/useLayout';
 
 import LoginScreen from './src/screens/LoginScreen';
 import AgeScreen from './src/screens/AgeScreen';
@@ -30,18 +33,21 @@ import AdminScreen from './src/screens/AdminScreen';
 import ApplyScreen from './src/screens/ApplyScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 import TabBar, { Tab } from './src/components/TabBar';
+import SideNav from './src/components/SideNav';
 
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
+
 import {
   registerForPush,
   unregisterPush,
   onNotificationTap,
 } from './src/lib/push';
+
 import { colors } from './src/lib/ui';
-import NotificationsScreen from './src/screens/NotificationsScreen';
 
 type Screen =
   | { name: 'boot' }
@@ -65,6 +71,7 @@ const needsAge = (m: any) => !m.ageVerified && !m.ageDeclaredAt;
 function Shell() {
   const insets = useSafeAreaInsets();
   const kbOpen = useKeyboardVisible();
+  const L = useLayout();
 
   const [screen, setScreen] = useState<Screen>({ name: 'boot' });
   const [tab, setTab] = useState<Tab>('home');
@@ -87,28 +94,36 @@ function Shell() {
     registerForPush().catch(() => {});
   };
 
-useEffect(() => {
-  (async () => {
-    const saved = storage.get('token');
-    if (!saved) return setScreen({ name: 'login' });
-    setToken(saved);
+  useEffect(() => {
+    (async () => {
+      const saved = storage.get('token');
 
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await afterLogin();
-        return;
-      } catch (e: any) {
-        if (e?.status === 401 || e?.status === 403) {   // token really is invalid or expired
-          setToken(null);
-          storage.del('token');
-          return setScreen({ name: 'login' });
-        }
-        if (attempt >= 2) return setScreen({ name: 'login' }); // offline: keep the token, retry next launch
-        await new Promise((r) => setTimeout(r, 1500));
+      if (!saved) {
+        return setScreen({ name: 'login' });
       }
-    }
-  })();
-}, []);
+
+      setToken(saved);
+
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await afterLogin();
+          return;
+        } catch (e: any) {
+          if (e?.status === 401 || e?.status === 403) {
+            setToken(null);
+            storage.del('token');
+            return setScreen({ name: 'login' });
+          }
+
+          if (attempt >= 2) {
+            return setScreen({ name: 'login' });
+          }
+
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    })();
+  }, []);
 
   const watchStream = async (streamId: string) => {
     try {
@@ -125,12 +140,18 @@ useEffect(() => {
     }
   };
 
-const openNotification = (d: any) => {
-  if (d?.type === 'live' && d.streamId) watchStream(String(d.streamId));
-  else if (d?.type === 'friend' || d?.type === 'chat') { setTab('chat'); setScreen({ name: 'home' }); }
-  else if (d?.type === 'refund') setScreen({ name: 'wallet' });
-  else if (d?.username) openProfile(String(d.username));   // new content, unlocks, approvals
-};
+  const openNotification = (d: any) => {
+    if (d?.type === 'live' && d.streamId) {
+      watchStream(String(d.streamId));
+    } else if (d?.type === 'friend' || d?.type === 'chat') {
+      setTab('chat');
+      setScreen({ name: 'home' });
+    } else if (d?.type === 'refund') {
+      setScreen({ name: 'wallet' });
+    } else if (d?.username) {
+      openProfile(String(d.username));
+    }
+  };
 
   // Tapping a notification: live opens the stream.
   // Chat and friend alerts open the Chat tab.
@@ -140,20 +161,22 @@ const openNotification = (d: any) => {
     return onNotificationTap((d) => {
       if (d?.type === 'live' && d.streamId) {
         watchStream(String(d.streamId));
-        
-      } else if (d?.type === 'chat' || d?.type === 'friend') {
+      } else if (
+        d?.type === 'chat' ||
+        d?.type === 'friend'
+      ) {
         setTab('chat');
+
         setChatTarget(
           d.friendshipId ? String(d.friendshipId) : null
         );
+
         setScreen({ name: 'home' });
+      } else if (d?.type === 'refund') {
+        setScreen({ name: 'wallet' });
+      } else if (d?.username) {
+        openProfile(String(d.username));
       }
-      else if (d?.type === 'refund') {
-  setScreen({ name: 'wallet' });
-} else if (d?.username) {
-  openProfile(String(d.username));
-}
-      
     });
   }, [me?.id]);
 
@@ -205,6 +228,34 @@ const openNotification = (d: any) => {
   const openRoom = (session: any) =>
     setScreen({ name: 'room', session });
 
+  // Android hardware back button.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (screen.name === 'home') {
+          if (tab !== 'home') {
+            setTab('home');
+            return true;
+          }
+
+          return false;
+        }
+
+        if (
+          ['boot', 'login', 'age', 'room'].includes(screen.name)
+        ) {
+          return false;
+        }
+
+        home();
+        return true;
+      }
+    );
+
+    return () => sub.remove();
+  }, [screen.name, tab]);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -214,7 +265,10 @@ const openNotification = (d: any) => {
         style={{
           flex: 1,
           paddingTop: insets.top,
-          paddingBottom: onTabs || kbOpen ? 0 : insets.bottom,
+          paddingBottom:
+            (onTabs && !L.wide) || kbOpen
+              ? 0
+              : insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
         }}
@@ -257,14 +311,31 @@ const openNotification = (d: any) => {
         )}
 
         {screen.name === 'home' && (
-          <View style={{ flex: 1 }}>
+          <View
+            style={{
+              flex: 1,
+              flexDirection: L.wide ? 'row' : 'column',
+            }}
+          >
+            {L.wide && (
+              <SideNav
+                tab={tab}
+                onChange={setTab}
+                badges={{ chat: unread }}
+              />
+            )}
+
             <View style={{ flex: 1 }}>
               {tab === 'home' && (
                 <HomeScreen
                   onOpenRoom={openRoom}
                   onOpenProfile={openProfile}
-                    onOpenWallet={() => setScreen({ name: 'wallet' })}
-                     onOpenNotifications={() => setScreen({ name: 'notifications' })}
+                  onOpenWallet={() =>
+                    setScreen({ name: 'wallet' })
+                  }
+                  onOpenNotifications={() =>
+                    setScreen({ name: 'notifications' })
+                  }
                 />
               )}
 
@@ -323,11 +394,13 @@ const openNotification = (d: any) => {
               )}
             </View>
 
-            <TabBar
-              tab={tab}
-              onChange={setTab}
-              badges={{ chat: unread }}
-            />
+            {!L.wide && (
+              <TabBar
+                tab={tab}
+                onChange={setTab}
+                badges={{ chat: unread }}
+              />
+            )}
           </View>
         )}
 
@@ -386,8 +459,11 @@ const openNotification = (d: any) => {
         )}
 
         {screen.name === 'notifications' && (
-  <NotificationsScreen onBack={home} onOpen={openNotification} />
-)}
+          <NotificationsScreen
+            onBack={home}
+            onOpen={openNotification}
+          />
+        )}
       </View>
     </KeyboardAvoidingView>
   );
