@@ -41,6 +41,7 @@ import SideNav from './src/components/SideNav';
 
 import { api, setToken } from './src/lib/api';
 import { storage } from './src/lib/storage';
+import { setCacheScope } from './src/lib/cache';
 
 import {
   registerForPush,
@@ -92,6 +93,7 @@ function Shell() {
 
   const afterLogin = async () => {
     const m = await api('/auth/me');
+    setCacheScope(m.id); // saved screen data belongs to this user only
     setMe(m);
 
     if (needsAge(m)) {
@@ -226,6 +228,7 @@ function Shell() {
 
     setToken(null);
     storage.del('token');
+    setCacheScope(null);
     setMe(null);
     setTab('home');
     setUnread(0);
@@ -240,6 +243,13 @@ function Shell() {
 
   const openRoom = (session: any) =>
     setScreen({ name: 'room', session });
+
+  // "Message" button inside a live room: open that conversation in the Chat tab.
+  const openChat = (friendshipId: string) => {
+    setTab('chat');
+    setChatTarget(friendshipId);
+    setScreen({ name: 'home' });
+  };
 
   // Android hardware back button.
   useEffect(() => {
@@ -501,6 +511,8 @@ function Shell() {
             session={screen.session}
             me={me}
             onLeave={home}
+            onOpenChat={openChat}
+            onOpenProfile={openProfile}
           />
         )}
 

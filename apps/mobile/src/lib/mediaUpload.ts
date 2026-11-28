@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { api } from './api';
 
 export const MAX_VIDEO_SECONDS = 15;
@@ -15,8 +16,6 @@ export type Picked = {
   width?: number;
   durationSec?: number;
 };
-
-import * as VideoThumbnails from 'expo-video-thumbnails';
 
 async function videoPreviewUri(uri: string): Promise<string | undefined> {
   if (Platform.OS === 'web') return undefined;          // not supported on web: falls back to the 🎬 placeholder
@@ -74,9 +73,30 @@ export async function pickMedia(): Promise<Picked | null> {
   return { kind: 'IMAGE', uri: a.uri, mimeType: 'image/jpeg', width: a.width };
 }
 
-async function putBlob(url: string, blob: Blob, contentType: string) {
-  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
-  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+/**
+ * Uploads one file to the storage bucket. Uses XMLHttpRequest because it behaves the same on
+ * Android, iOS and web, and it lets us show the real reason when the bucket refuses the file.
+ */
+function putBlob(url: string, blob: Blob, contentType: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.timeout = 120_000;
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      const code = /<Code>([^<]+)<\/Code>/.exec(xhr.responseText || '')?.[1];
+      reject(new Error(`Upload failed (${xhr.status}${code ? `: ${code}` : ''})`));
+    };
+    xhr.onerror = () =>
+      reject(new Error(
+        Platform.OS === 'web'
+          ? 'Upload was blocked. Add this website to the R2 bucket CORS settings.'
+          : 'Upload could not reach storage. Check your connection and try again.',
+      ));
+    xhr.ontimeout = () => reject(new Error('Upload took too long. Try a smaller file or a better connection.'));
+    xhr.send(blob);
+  });
 }
 
 /** Uploads straight to storage, then registers the item. Photos are re-encoded as JPEG (this also removes location data). */
@@ -98,6 +118,7 @@ export async function uploadMedia(
   }
 
   const mainBlob = await (await fetch(mainUri)).blob();
+  if (!mainBlob.size) throw new Error('Could not read the selected file. Pick it again.');
   const previewBlob = previewUri ? await (await fetch(previewUri)).blob() : null;
 
   progress('Uploading...');

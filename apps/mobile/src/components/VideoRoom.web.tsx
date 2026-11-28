@@ -5,14 +5,17 @@ type Props = {
   url: string; token: string; publish: boolean;
   onMessage: (m: any) => void;
   onDisconnected: () => void;
+  onCount?: (n: number) => void;
 };
 
-export default function VideoRoom({ url, token, publish, onMessage, onDisconnected }: Props) {
+export default function VideoRoom({ url, token, publish, onMessage, onDisconnected, onCount }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onMsg = useRef(onMessage);
   const onDisc = useRef(onDisconnected);
+  const onCnt = useRef(onCount);
   onMsg.current = onMessage;
   onDisc.current = onDisconnected;
+  onCnt.current = onCount;
 
   useEffect(() => {
     const room = new Room();
@@ -33,6 +36,11 @@ export default function VideoRoom({ url, token, publish, onMessage, onDisconnect
       if (participant) return;
       try { onMsg.current(JSON.parse(new TextDecoder().decode(payload))); } catch {}
     });
+
+    const count = () => onCnt.current?.(room.remoteParticipants.size);
+    room.on(RoomEvent.Connected, count);
+    room.on(RoomEvent.ParticipantConnected, count);
+    room.on(RoomEvent.ParticipantDisconnected, count);
 
     room.on(RoomEvent.Disconnected, () => { if (!closed) onDisc.current(); });
 

@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Btn from '../components/Btn';
-import { api } from '../lib/api';
+import CountryPicker from '../components/CountryPicker';
 import { colors } from '../lib/ui';
+import { useCachedQuery } from '../lib/cache';
+import { countryName, ensureCountrySynced, flag, saveCountry, savedCountry } from '../lib/countries';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
@@ -14,21 +16,36 @@ export default function MeScreen({
   onOpenGuidelines: () => void;
   onLogout: () => void;
 }) {
-  const [me, setMe] = useState<any>(null);
-  const [err, setErr] = useState('');
-
-  const load = useCallback(async () => {
-    try { setMe(await api('/auth/me')); setErr(''); } catch (e: any) { setErr(e.message); }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const poll = setInterval(load, 15000);
-    return () => clearInterval(poll);
-  }, [load]);
+  // Shows the saved profile instantly and checks the server again every 30s.
+  const q = useCachedQuery<any>('/auth/me', { staleMs: 20_000, pollMs: 30_000 });
+  const me = q.data;
+  const err = q.loaded && !me ? q.error : '';
 
   const isCreator = me?.role === 'CREATOR';
   const isAdmin = me?.role === 'ADMIN';
+
+  const [country, setCountry] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [countryErr, setCountryErr] = useState('');
+
+  useEffect(() => {
+    if (!me?.id || !isCreator) return;
+    ensureCountrySynced(me.id);
+    setCountry(savedCountry(me.id));
+  }, [me?.id, isCreator]);
+
+  const pick = async (cc: string) => {
+    if (!me?.id) return;
+    setCountryErr('');
+    try {
+      await saveCountry(me.id, cc);
+      setCountry(cc);
+      setPicking(false);
+    } catch (e: any) {
+      setCountryErr(e.message);
+      setPicking(false);
+    }
+  };
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.content}>
@@ -65,6 +82,11 @@ export default function MeScreen({
           {isCreator && (
             <View style={s.card}>
               <Text style={s.name}>Creator</Text>
+              <Text style={s.muted}>
+                Country shown on your live card: {country ? `${flag(country)} ${countryName(country)}` : 'not set'}
+              </Text>
+              {!!countryErr && <Text style={s.err}>{countryErr}</Text>}
+              <Btn label="Change country" onPress={() => setPicking(true)} outline />
               {!!me.creator?.username && (
                 <Btn label="My profile" onPress={() => onOpenProfile(me.creator.username)} outline />
               )}
@@ -83,6 +105,8 @@ export default function MeScreen({
 
       <Btn label="Community guidelines" onPress={onOpenGuidelines} outline />
       <Btn label="Log out" onPress={onLogout} outline />
+
+      <CountryPicker visible={picking} selected={country} onPick={pick} onClose={() => setPicking(false)} />
     </ScrollView>
   );
 }

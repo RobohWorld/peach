@@ -1,5 +1,4 @@
-
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccessToken } from 'livekit-server-sdk';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -36,6 +35,22 @@ export class StreamsService {
     });
 
     return at.toJwt();
+  }
+
+  /** Saves the 2-letter country code shown as a flag on the user's live card. */
+  async setCountry(userId: string, country: string) {
+    const cc = (country ?? '').trim().toUpperCase();
+
+    if (!/^[A-Z]{2}$/.test(cc)) {
+      throw new BadRequestException('Invalid country');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { country: cc },
+    });
+
+    return { country: cc };
   }
 
   async listLive(
@@ -113,6 +128,7 @@ export class StreamsService {
             id: true,
             name: true,
             avatarUrl: true,
+            country: true,
             creator: {
               select: {
                 username: true,
@@ -160,6 +176,7 @@ export class StreamsService {
         id: s.creator.id,
         name: s.creator.name,
         avatarUrl: s.creator.avatarUrl,
+        country: s.creator.country,
         username: s.creator.creator?.username ?? null,
       },
 
@@ -266,7 +283,7 @@ export class StreamsService {
       throw new ForbiddenException('Age verification required');
     }
 
-    const [profile, follow] = await Promise.all([
+    const [profile, follow, host] = await Promise.all([
       this.prisma.creatorProfile.findUnique({
         where: { userId: stream.creatorId },
         select: { username: true },
@@ -280,6 +297,11 @@ export class StreamsService {
           },
         },
       }),
+
+      this.prisma.user.findUnique({
+        where: { id: stream.creatorId },
+        select: { name: true, avatarUrl: true, country: true },
+      }),
     ]);
 
     return {
@@ -288,6 +310,9 @@ export class StreamsService {
       creator: {
         id: stream.creatorId,
         username: profile?.username ?? null,
+        name: host?.name ?? null,
+        avatarUrl: host?.avatarUrl ?? null,
+        country: host?.country ?? null,
         isFollowing: !!follow,
       },
 

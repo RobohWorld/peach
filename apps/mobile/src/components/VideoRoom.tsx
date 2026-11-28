@@ -7,6 +7,8 @@ type Props = {
   url: string; token: string; publish: boolean;
   onMessage: (m: any) => void;
   onDisconnected: () => void;
+  /** Called with the number of viewers whenever someone joins or leaves. */
+  onCount?: (n: number) => void;
 };
 
 function decode(bytes: Uint8Array): string {
@@ -24,11 +26,12 @@ function Stage() {
   return <VideoTrack trackRef={ref} style={s.fill} />;
 }
 
-export default function VideoRoom({ url, token, publish, onMessage, onDisconnected }: Props) {
+export default function VideoRoom({ url, token, publish, onMessage, onDisconnected, onCount }: Props) {
   const room = useMemo(() => new Room(), []);
   const [perm, setPerm] = useState<'pending' | 'ok' | 'denied'>(publish && Platform.OS === 'android' ? 'pending' : 'ok');
   const onMsg = useRef(onMessage); onMsg.current = onMessage;
   const onDisc = useRef(onDisconnected); onDisc.current = onDisconnected;
+  const onCnt = useRef(onCount); onCnt.current = onCount;
 
   useEffect(() => {
     if (!publish || Platform.OS !== 'android') return;
@@ -48,9 +51,17 @@ export default function VideoRoom({ url, token, publish, onMessage, onDisconnect
       if (participant) return;
       try { onMsg.current(JSON.parse(decode(payload))); } catch {}
     };
+    // Everyone else in the room (the host counts as one for viewers, so this equals the viewer count).
+    const count = () => onCnt.current?.(room.remoteParticipants.size);
     room.on(RoomEvent.DataReceived, handler as any);
+    room.on(RoomEvent.Connected, count);
+    room.on(RoomEvent.ParticipantConnected, count);
+    room.on(RoomEvent.ParticipantDisconnected, count);
     return () => {
       room.off(RoomEvent.DataReceived, handler as any);
+      room.off(RoomEvent.Connected, count);
+      room.off(RoomEvent.ParticipantConnected, count);
+      room.off(RoomEvent.ParticipantDisconnected, count);
       AudioSession.stopAudioSession();
     };
   }, [room]);
