@@ -51,6 +51,7 @@ import {
 
 import { colors } from './src/lib/ui';
 import GuidelinesScreen from './src/screens/GuidelinesScreen';
+import { Analytics } from "@vercel/analytics/next"
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -531,6 +532,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <Shell />
+      <Analytics/>
     </SafeAreaProvider>
   );
 }
